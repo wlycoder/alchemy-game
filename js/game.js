@@ -159,8 +159,6 @@ function pickSageVariantFor() {
 /* ============================================================
    贤者炼制可选变种
    ============================================================ */
-/* ★ 修改：目标为初级贤者之石时，四种变种（标准 / 温和 / 炽热 / 疯狂）均可随意指定，
-      不再受已拥有的中等贤者之石变种限制 */
 function getSageCraftVariants(targetPotionId) {
   /* 初级贤者之石：无条件开放四种变种，任选其一 */
   if (targetPotionId === SAGE.id) {
@@ -182,24 +180,20 @@ function getSageCraftVariants(targetPotionId) {
   return list;
 }
 
-/* 把初级贤者之石加入可炼制药剂列表 */
 function getSageCraftPotions() {
   const list = [];
   for (const r of RECIPES) if (state.discovered.has(r.id)) list.push(r);
   for (const t of TIER2) if (state.discovered.has(t.id)) list.push(t);
-  /* 初级贤者之石——发现后即可通过贤者炼制指定变种炼制 */
   if (state.discovered.has(SAGE.id)) {
     list.push(SAGE);
   }
   return list;
 }
 
-/* 判断药剂是否为贤者之石 */
 function isSagePotionTarget(potionId) {
   return potionId === SAGE.id;
 }
 
-/* 修正贤者之石的变种选择（只允许 SAGE_ALLOWED_VARIANTS） */
 function normalizeSageCraftVariant() {
   if (!state.sageCraft.potionId) return;
   if (isSagePotionTarget(state.sageCraft.potionId)) {
@@ -702,8 +696,8 @@ function renderCodex() {
       burning: '全程均温保持在 63° 以上。',
       refreshing: '将已炼成的药水重新投入坩埚重炼，60% 概率转化为提神的；失败则原样退回。',
       mad: '频繁逃出舒适区（≥4 次）就会癫狂。',
-      pure: '连续炼出 5 瓶相同药剂后，下一瓶有 50% 概率成为纯净；每次失败概率 +10%，成功则清零重来。拥有纯净的初等贤者之石后，可在贤者炼制中直接指定。',
-      mysterious: '每 100 次炼药约有 3 次会自行踏入这条小径。最终贤者之石可在贤者炼制中指定，成功率为 30%；失败则得到随机药剂的随机变种。',
+      pure: '连续炼出 5 瓶相同药剂后，下一瓶有 50% 概率成为纯净；每次失败概率 +10%，成功则清零重来。贤者指定炼制同样可以触发纯净连击；拥有纯净的初等贤者之石后，可在贤者炼制中直接指定。',
+      mysterious: '每 100 次炼药约有 3 次会自行踏入这条小径。最终贤者之石可在贤者炼制中指定，成功率为 80%；失败则得到随机药剂的随机变种。',
     };
     div.innerHTML = `
       <div class="codex-head">
@@ -758,7 +752,7 @@ function renderCodex() {
     </div>
     <div class="codex-body">${
       state.finalSageOwned
-        ? '🏆 可指定全部 7 种变种。选择神秘的时 30% 成功率；失败则得到随机药剂的随机变种。'
+        ? '🏆 可指定全部 7 种变种。选择神秘的时 80% 成功率；失败则得到随机药剂的随机变种。'
         : state.pureSageOwned
           ? '以 4 种中等贤者之石 + 纯净初等贤者之石 + 睿智药剂 + 任意神秘药剂炼制。'
           : '需要先炼制纯净的初等贤者之石。'
@@ -878,7 +872,7 @@ function renderTier2() {
       <div class="upg-name">最终贤者之石<span>${FINAL_SAGE.price}💰</span></div>
       <div class="upg-desc"><span>4 种中等贤者之石 + 纯净初等 + 1 瓶</span>${iconHTML('🔮', 1)}<span>睿智药剂 + 1 瓶任意</span>${iconHTML('🔮', 1)}<span>神秘药剂</span></div>
       <div class="upg-desc">${
-        state.finalSageOwned ? '<b style="color:#ffdca0">✅ 已拥有 · 贤者炼制已解锁全部变种（神秘的 30%）</b>' :
+        state.finalSageOwned ? '<b style="color:#ffdca0">✅ 已拥有 · 贤者炼制已解锁全部变种（神秘的 80%）</b>' :
         !state.pureSageOwned ? '<span style="color:#6f6a8a">需要先炼制纯净的初等贤者之石</span>' :
         canFinal ? '<b style="color:#ffdca0">可炼制 · 终极仪式</b>' :
         '<span style="color:#6f6a8a">材料不足</span>'
@@ -1029,7 +1023,7 @@ function renderGrimoire() {
       <span class="r-icon">${FINAL_SAGE.icon}</span>
       <div class="r-body">
         <div class="r-name">${FINAL_SAGE.name}</div>
-        <div class="r-mats">可指定任意变种炼制（神秘的 30%）</div>
+        <div class="r-mats">可指定任意变种炼制（神秘的 80%）</div>
         <div class="r-hint" style="color:#ffdca0;font-style:normal">🏆 炼金术的终极彼岸</div>
       </div>`;
     pane.appendChild(fdiv);
@@ -1222,7 +1216,7 @@ function renderSageCraft() {
     } else if (v === 'mysterious') {
       btn.title = `神秘的 · 成功率 ${(SAGE_CRAFT.finalSageMysteryChance*100).toFixed(0)}%（失败则得到随机药剂的随机变种）`;
     } else if (v === 'pure') {
-      btn.title = '纯净的 · 由纯净的初等贤者之石解锁';
+      btn.title = '纯净的 · 由纯净的初等贤者之石解锁（也可由纯净连击触发）';
     } else if (isSageTarget) {
       btn.title = '初级贤者之石 · 四种变种任选';
     }
@@ -1400,6 +1394,11 @@ function finishSageCraft() {
 
   const isSagePotion = isSagePotionTarget(target.potionId);
 
+  /* ★ 连击记录：非贤者之石目标都参与纯净连击 */
+  if (!isSagePotion) {
+    recordBrewStreak(target.potionId);
+  }
+
   let actualVariant = target.variant;
   let mysteryFailed = false;
 
@@ -1438,14 +1437,24 @@ function finishSageCraft() {
   }
 
   if (!mysteryFailed) {
-    const vd = VARIANTS[actualVariant];
+    /* ★ 纯净连击：非贤者之石、非神秘目标可触发，覆盖用户指定的变种 */
+    let finalVariant = actualVariant;
+    let pureFromStreak = false;
+    if (!isSagePotion && actualVariant !== 'mysterious') {
+      if (rollPure()) {
+        finalVariant = 'pure';
+        pureFromStreak = true;
+      }
+    }
+
+    const vd = VARIANTS[finalVariant];
     const vTxt = vd.name ? `${vd.icon}${vd.name}` : '';
 
     if (isSagePotion) {
       /* ★ 炼制贤者之石 */
-      if (!SAGE_ALLOWED_VARIANTS.includes(actualVariant)) actualVariant = 'standard';
+      if (!SAGE_ALLOWED_VARIANTS.includes(finalVariant)) finalVariant = 'standard';
 
-      state.sageVariants.add(actualVariant);
+      state.sageVariants.add(finalVariant);
       state.stats.sageCraftCount++;
       state.discovered.add(SAGE.id);
 
@@ -1453,29 +1462,34 @@ function finishSageCraft() {
       setTimeout(() => cauldronEl.classList.remove('glow-sage'), 1600);
       showEventBanner('🔴 贤者之石诞生！', 'good');
 
-      const avd = VARIANTS[actualVariant];
+      const avd = VARIANTS[finalVariant];
       const avTxt = avd.name ? `${avd.icon}${avd.name}·` : '';
       log(`🔴✨ 贤者之力凝练出【${avTxt}初级贤者之石】！`, 'sage');
 
       if (!state.activeSageVariant || !state.sageVariants.has(state.activeSageVariant)) {
-        if (SAGE_ALLOWED_VARIANTS.includes(actualVariant)) {
-          state.activeSageVariant = actualVariant;
+        if (SAGE_ALLOWED_VARIANTS.includes(finalVariant)) {
+          state.activeSageVariant = finalVariant;
         }
       }
     } else {
       /* 普通药剂 */
-      potSlot(target.potionId, actualVariant)[2]++;
+      potSlot(target.potionId, finalVariant)[2]++;
       state.stats.potionsBrewed++;
       state.stats.perfectBrewed++;
       state.stats.sageCraftCount++;
-      state.stats.variantsSeen.add(actualVariant);
+      state.stats.variantsSeen.add(finalVariant);
 
-      if (actualVariant === 'mysterious') {
+      if (pureFromStreak) {
+        cauldronEl.classList.add('glow-pure');
+        setTimeout(() => cauldronEl.classList.remove('glow-pure'), 1800);
+        showEventBanner('✨ 纯净的祝福！', 'pure');
+        log(`✨ 连击达成！贤者之力凝练出【完美·${vTxt}${def.name}】`, 'pure');
+      } else if (finalVariant === 'mysterious') {
         cauldronEl.classList.add('glow-mystery');
         setTimeout(() => cauldronEl.classList.remove('glow-mystery'), 2200);
         showEventBanner('🔮 神秘的共鸣……', 'mystery');
         log(`🔮✨ 贤者之力凝练出【完美·${vTxt}${def.name}】！`, 'mystery');
-      } else if (actualVariant === 'pure') {
+      } else if (finalVariant === 'pure') {
         cauldronEl.classList.add('glow-pure');
         setTimeout(() => cauldronEl.classList.remove('glow-pure'), 1600);
         showEventBanner('✨ 纯净的结晶', 'pure');
@@ -1484,6 +1498,11 @@ function finishSageCraft() {
         cauldronEl.classList.add('glow-sage');
         setTimeout(() => cauldronEl.classList.remove('glow-sage'), 900);
         log(`🟣 贤者之力凝练出【完美·${vTxt}${def.name}】`, 'sage');
+      }
+
+      /* ★ 连击提示 */
+      if (isInStreak(target.potionId)) {
+        log(`📈 连击 ×${state.streakCount}　下次纯净概率 ${(state.pureChance*100).toFixed(0)}%`, 'warn');
       }
     }
   }
@@ -2239,7 +2258,7 @@ function craftFinalSage() {
   spawnBubbles(35);
   showEventBanner('🌌 最终贤者之石诞生！', 'ultimate');
   log('🌌✨✨✨ 最终贤者之石诞生了！你已抵达炼金术的终极彼岸。', 'ultimate');
-  log('🌌 贤者炼制界面已解锁全部 7 种变种。选择神秘的时 30% 成功率。', 'sage');
+  log('🌌 贤者炼制界面已解锁全部 7 种变种。选择神秘的时 80% 成功率。', 'sage');
 
   state.gold += 5000;
   state.rep += 500;
@@ -2839,14 +2858,14 @@ if (loaded) {
   log('❄️🔥 投料顺序会偏移舒适区，温度控制决定药剂变种。');
   log('💫 炼制过程中，舒适区会随机漂移——留意绿色温度带。');
   log('🔮 每 100 次炼药约有 3 次会自行踏入神秘的小径。');
-  log('✨ 连续炼出 5 瓶相同药剂，可累积"纯净"概率。');
+  log('✨ 连续炼出 5 瓶相同药剂，可累积"纯净"概率。贤者指定炼制同样可以触发。');
   log('💧 重炼：把已有药水送上重炼台（🔄），60% 转为提神的。');
   log('🟣 集齐初级贤者之石与完美智慧药剂，可炼制中等贤者之石。');
   log('🟣 拥有中等贤者之石后，初级贤者之石选择器将隐藏，改用「贤者指定」。');
   log('🔴 贤者指定炼制初级贤者之石时，标准 / 温和 / 炽热 / 疯狂四种变种可任选其一。');
   log('💠 集齐 4 种中等贤者之石，可炼制纯净的初等贤者之石——解锁「纯净」指定。');
   log('🌌 唯有纯净初等 + 5 种贤者之石 + 睿智药剂 + 神秘药剂，方能成就最终贤者之石。');
-  log('🌌 最终贤者之石可指定任意变种；选择神秘的时 30% 成功率。');
+  log('🌌 最终贤者之石可指定任意变种；选择神秘的时 80% 成功率。');
 }
 
 brew.active = false;

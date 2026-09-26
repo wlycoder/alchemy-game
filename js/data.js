@@ -50,7 +50,7 @@ const FINAL_SAGE = {
 /* 贤者指定炼制配置 */
 const SAGE_CRAFT = {
   minMaterials: 2,               // 至少投入 2 种材料
-  finalSageMysteryChance: 0.3,   // 神秘的炼制成功率（30%）
+  finalSageMysteryChance: 0.8,   // 神秘的炼制成功率（80%）
 };
 
 const RECIPES = [
