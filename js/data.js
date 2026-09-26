@@ -26,6 +26,33 @@ const VARIANTS = {
 };
 const VARIANT_ORDER = ['standard','gentle','burning','refreshing','mad','pure','mysterious'];
 
+const SAGE_ALLOWED_VARIANTS = ['standard', 'gentle', 'burning', 'mad'];
+
+const MID_SAGE = {
+  name: '中等贤者之石',
+  icon: '🟣',
+  price: 2000,
+  failChance: 0.3,
+};
+
+const PURE_SAGE = {
+  name: '纯净的初等贤者之石',
+  icon: '💠',
+  price: 5000,
+};
+
+const FINAL_SAGE = {
+  name: '最终贤者之石',
+  icon: '🌌',
+  price: 20000,
+};
+
+/* 贤者指定炼制配置 */
+const SAGE_CRAFT = {
+  minMaterials: 2,               // 至少投入 2 种材料
+  finalSageMysteryChance: 0.3,   // 神秘的炼制成功率（30%）
+};
+
 const RECIPES = [
   { id:'heal',     name:'治疗药水', icon:'🧪', price:50,  mats:['herb','water'],               hint:'植物与水，生命之始' },
   { id:'strength', name:'力量药剂', icon:'💪', price:60,  mats:['mushroom','fire'],            hint:'火光炙烤着阴暗的菌类' },
@@ -160,7 +187,6 @@ const CHAINS = [
       { potion:'static', qty:1, variant:'mad',       text:'那么，再给我一瓶疯狂点的静电。', bonusRep:30 },
     ]
   },
-  /* ============ 瘟疫链 ============ */
   {
     id:'plague', title:'瘟疫蔓延', client:'healer', chainClass:'plague',
     steps:[
@@ -175,7 +201,6 @@ const CHAINS = [
         bonusGold:800, bonusRep:120 },
     ]
   },
-  /* ============ 战争链 ============ */
   {
     id:'war', title:'战争的阴云', client:'commander', chainClass:'war',
     steps:[
@@ -214,7 +239,6 @@ const VARIANT_THRESHOLDS = {
   gentleAvgTemp: 48,
   burningAvgTemp: 63,
   madEscapes: 4,
-  refreshingRatio: 0.62,
 };
 
 const ZONE_DRIFT = {
@@ -226,30 +250,23 @@ const ZONE_DRIFT = {
   shiftMax: 17,
 };
 
-/* 神秘变种触发概率 */
 const MYSTERIOUS_CHANCE = 0.03;
+const PURE_STREAK = { required: 5, baseChance: 0.5, increment: 0.1, maxChance: 0.95 };
+const REFINE_CHANCE = 0.6;
 
-/* 纯净的连击系统参数 */
-const PURE_STREAK = {
-  required: 5,        // 需要连续炼出多少瓶相同药剂
-  baseChance: 0.5,    // 触发后的初始概率
-  increment: 0.1,     // 每次失败后的概率增量
-  maxChance: 0.95,    // 概率上限
-};
-
-/* 变种提示（在云游商人成交后随机揭示） */
 const VARIANT_TIPS = [
   { v:'gentle',     tip:'📖 变种手册：「温和的」——全程均温保持在 48° 以下即可。' },
   { v:'burning',    tip:'📖 变种手册：「炽热的」——全程均温保持在 63° 以上即可。' },
-  { v:'refreshing', tip:'📖 变种手册：「提神的」——待在舒适区的时间占比超过 62%。' },
+  { v:'refreshing', tip:'📖 变种手册：「提神的」——将已炼成的药水重新投入坩埚重炼，60% 概率转化为提神的；失败则原样退回。' },
   { v:'mad',        tip:'📖 变种手册：「疯狂的」——频繁逃出舒适区（≥4 次）就会癫狂。' },
   { v:'pure',       tip:'📖 变种手册：「纯净的」——连续炼出 5 瓶相同药剂后，下一瓶有 50% 概率成为纯净；失败则概率 +10%，成功则清零重来。' },
-  { v:'mysterious', tip:'📖 变种手册：「神秘的」——可遇不可求。据说有 3% 的炼药会自行踏入这条小径。' },
+  { v:'mysterious', tip:'📖 变种手册：「神秘的」——可遇不可求。每 100 次炼药约有 3 次会自行踏入这条小径。' },
+  { v:'midsage',    tip:'📖 贤者进阶：1 个初级贤者之石 + 1 瓶完美品质智慧药剂，可炼制中等贤者之石，30% 失败率。' },
+  { v:'sagecraft',  tip:'📖 贤者指定：持有中等贤者之石后，可指定任意药剂与变种，投入任意 2 种材料直接炼制（完美品质）。' },
+  { v:'puresage',   tip:'📖 纯净贤者：集齐 4 种中等贤者之石后，消耗 1 瓶纯净的万灵药 + 4 瓶完美品质智慧药剂，可炼制纯净的初等贤者之石。' },
+  { v:'finalsage',  tip:'📖 贤者之极：4 种中等贤者之石 + 1 个纯净的初等贤者之石 + 1 瓶睿智药剂 + 1 瓶任意神秘的药剂。最终贤者之石可指定任意变种；选择神秘的时 30% 成功率，失败则得到随机药剂的随机变种。' },
 ];
 
-/* ============================================================
-   成就定义
-   ============================================================ */
 const ACHIEVEMENTS = [
   { id:'first_potion',   name:'初出茅庐', icon:'🌱', desc:'炼出第一瓶药剂',
     check: s => s.stats.potionsBrewed >= 1 },
@@ -261,8 +278,18 @@ const ACHIEVEMENTS = [
     check: s => s.stats.variantsSeen.size >= 7 },
   { id:'sage_path',      name:'贤者之路', icon:'🔴', desc:'炼成初级贤者之石',
     check: s => s.sageVariants.size >= 1 },
-  { id:'sage_triad',     name:'贤者三重', icon:'🧙', desc:'拥有 3 种贤者之石变种',
+  { id:'sage_triad',     name:'贤者三重', icon:'🧙', desc:'拥有 3 种初级贤者之石变种',
     check: s => s.sageVariants.size >= 3 },
+  { id:'mid_sage',       name:'贤者进阶', icon:'🟣', desc:'炼制出中等贤者之石',
+    check: s => s.midSageVariants.size >= 1 },
+  { id:'mid_sage_all',   name:'贤者大成', icon:'🌌', desc:'集齐 4 种变种的中等贤者之石',
+    check: s => s.midSageVariants.size >= 4 },
+  { id:'pure_sage',      name:'纯净贤者', icon:'💠', desc:'炼制出纯净的初等贤者之石',
+    check: s => s.pureSageOwned },
+  { id:'final_sage',     name:'终极贤者', icon:'🌌', desc:'炼制出最终贤者之石',
+    check: s => s.finalSageOwned },
+  { id:'sage_crafter',   name:'贤者之手', icon:'🖐️', desc:'使用中等贤者之石指定炼制 10 次',
+    check: s => s.stats.sageCraftCount >= 10 },
   { id:'merchant_friend',name:'商人的朋友', icon:'🤝', desc:'与云游商人完成 10 次交易',
     check: s => s.stats.merchantDeals >= 10 },
   { id:'rich',           name:'炼金首富', icon:'💎', desc:'金币达到 5000',
@@ -287,4 +314,6 @@ const ACHIEVEMENTS = [
     check: s => s.stats.variantsSeen.has('mysterious') },
   { id:'pure_master',    name:'纯净之心', icon:'✨', desc:'炼出「纯净的」变种',
     check: s => s.stats.variantsSeen.has('pure') },
+  { id:'refiner',        name:'重炼师',   icon:'💧', desc:'重炼出「提神的」变种',
+    check: s => s.stats.variantsSeen.has('refreshing') && s.stats.refineCount >= 1 },
 ];
