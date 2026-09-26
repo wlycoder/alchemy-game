@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚗️ 炼金工坊 · 贤者之路</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="event-banner" id="eventBanner"></div>
+<div class="achievement-popup" id="achievementPopup"></div>
+
+<div class="game">
+  <header>
+    <h1>⚗️ 炼 金 工 坊</h1>
+    <div class="stats">
+      <div class="stat">💰 <b id="gold">0</b></div>
+      <div class="stat" id="repStat">🏅 <b id="rep">0</b></div>
+      <div class="stat">📖 <b id="disc">0/12</b></div>
+      <div class="stat">🏆 <b id="achCount">0/14</b></div>
+      <div class="stat sage">🧙 <b id="merchantEta">--</b></div>
+    </div>
+    <div class="header-actions">
+      <button class="mini-btn" id="saveBtn" title="保存进度">💾</button>
+      <button class="mini-btn" id="resetBtn" title="重置游戏">🔄</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>材 料 架</h2>
+      <div class="ing-grid" id="ingGrid"></div>
+    </section>
+
+    <section class="panel">
+      <h2>炼 金 坩 埚</h2>
+      <div class="cauldron-stage">
+        <div class="cauldron" id="cauldron">
+          <div class="rim"></div>
+          <div class="pot">
+            <div class="liquid" id="liquid"></div>
+            <div class="bubble-layer" id="bubbleLayer"></div>
+          </div>
+          <div class="fire">🔥🔥🔥</div>
+        </div>
+      </div>
+      <div class="slots">
+        <div class="slot"></div>
+        <div class="slot"></div>
+        <div class="slot"></div>
+      </div>
+
+      <div class="brew-ui" id="brewUI">
+        <div class="heat-bar">
+          <div class="heat-zone" id="heatZone"></div>
+          <div class="heat-fill" id="heatFill"></div>
+          <div class="heat-marker" id="heatMarker"></div>
+        </div>
+        <div class="heat-scale"><span>0°</span><span>50°</span><span>100°</span></div>
+        <div class="brew-progress"><i id="brewProgress"></i></div>
+        <div class="brew-row">
+          <div class="brew-quality" id="brewQuality">品质：<b style="color:#9aa0a6">普通</b></div>
+          <button id="heatBtn">按 住 加 热</button>
+        </div>
+        <div class="brew-hint" id="brewHint">均温 --° · 逃离舒适区 0 次</div>
+      </div>
+
+      <div class="sage-selector" id="sageSelector">
+        <div class="ss-title">🔴 自动炼制变种</div>
+        <div class="ss-row" id="sageRow"></div>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" id="brewBtn">调 配</button>
+        <button class="btn" id="clearBtn">清 空</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="tabs">
+        <button class="tab active" data-tab="orders">订单</button>
+        <button class="tab" data-tab="tier2">进阶</button>
+        <button class="tab" data-tab="upgrades">升级</button>
+        <button class="tab" data-tab="achievements">成就</button>
+        <button class="tab" data-tab="codex">手册</button>
+        <button class="tab" data-tab="grimoire">图鉴</button>
+      </div>
+      <div class="tab-pane active" id="pane-orders"></div>
+      <div class="tab-pane" id="pane-tier2"></div>
+      <div class="tab-pane" id="pane-upgrades"></div>
+      <div class="tab-pane" id="pane-achievements"></div>
+      <div class="tab-pane" id="pane-codex"></div>
+      <div class="tab-pane" id="pane-grimoire"></div>
+    </section>
+  </main>
+
+  <section class="panel shelf-panel">
+    <h2>药 水 架　<small>点击徽章出售</small></h2>
+    <div class="shelf" id="shelf"></div>
+  </section>
+
+  <section class="panel log-panel">
+    <div class="log" id="log"></div>
+  </section>
+</div>
+
+<div class="merchant-modal" id="merchantModal">
+  <div class="merchant-card">
+    <div class="merchant-head">
+      <span class="m-avatar">🧙</span>
+      <div>
+        <div class="m-name" id="mName">云 游 商 人</div>
+        <div class="m-quote" id="mQuote">"这些药水，我全都要了。"</div>
+      </div>
+    </div>
+    <div class="m-list" id="mList"></div>
+    <div class="m-total"><span>收购总计</span><b id="mTotalGold">0 💰</b></div>
+    <div class="m-gift" id="mGift"></div>
+    <div class="m-actions">
+      <button class="btn primary" id="mAccept">成 交</button>
+      <button class="btn" id="mDecline">谢 绝</button>
+    </div>
+    <div class="m-timer"><i id="mTimerBar"></i></div>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
