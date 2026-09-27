@@ -126,6 +126,12 @@ const sageMult   = () => 1 + 0.20 * state.upgrades.sage;
 const repBonusMult = () => 1 + 0.30 * state.upgrades.charm;
 const maxOrders  = () => 2 + state.upgrades.orders;
 
+/* ★ 中等贤者之石数量带来的炼制加速倍率（1.0 ~ 1.6） */
+const midSageSpeedMult = () => {
+  const n = Math.min(state.midSageVariants.size, 4);
+  return 1 + Math.min(MID_SAGE_SPEED.max, n * MID_SAGE_SPEED.perStone);
+};
+
 const getRecipe = id => RECIPES.find(r => r.id === id);
 const getTier2  = id => TIER2.find(t => t.id === id);
 function potionDef(id) {
@@ -171,6 +177,10 @@ function getSageCraftVariants(targetPotionId) {
   }
   if (state.pureSageOwned && !list.includes('pure')) {
     list.push('pure');
+  }
+  /* ★ 只要拥有任意中等贤者之石，即可指定“神秘的” */
+  if (state.midSageVariants.size > 0 && !list.includes('mysterious')) {
+    list.push('mysterious');
   }
   if (state.finalSageOwned) {
     for (const v of VARIANT_ORDER) {
@@ -697,7 +707,7 @@ function renderCodex() {
       refreshing: '将已炼成的药水重新投入坩埚重炼，60% 概率转化为提神的；失败则原样退回。',
       mad: '频繁逃出舒适区（≥4 次）就会癫狂。',
       pure: '连续炼出 5 瓶相同药剂后，下一瓶有 50% 概率成为纯净；每次失败概率 +10%，成功则清零重来。贤者指定炼制同样可以触发纯净连击；拥有纯净的初等贤者之石后，可在贤者炼制中直接指定。',
-      mysterious: '每 100 次炼药约有 3 次会自行踏入这条小径。最终贤者之石可在贤者炼制中指定，成功率为 80%；失败则得到随机药剂的随机变种。',
+      mysterious: '每 100 次炼药约有 8 次会自行踏入这条小径。拥有中等贤者之石后，可在贤者炼制中直接指定，成功率为 80%；失败则得到随机药剂的随机变种。',
     };
     div.innerHTML = `
       <div class="codex-head">
@@ -727,6 +737,22 @@ function renderCodex() {
         : '以 1 个初级贤者之石 + 1 瓶完美品质智慧药剂炼制，30% 失败率。'
     }</div>`;
   pane.appendChild(midInfo);
+
+  /* ★ 新增：贤者加速说明 */
+  const speedPct = Math.round((midSageSpeedMult() - 1) * 100);
+  const spdInfo = document.createElement('div');
+  spdInfo.className = 'codex-item ' + (state.midSageVariants.size > 0 ? 'known' : 'unknown');
+  spdInfo.innerHTML = `
+    <div class="codex-head">
+      <span class="ci-icon">⏩</span>
+      <span class="ci-name">贤者加速</span>
+    </div>
+    <div class="codex-body">${
+      state.midSageVariants.size > 0
+        ? `当前拥有 ${state.midSageVariants.size} 种中等贤者之石，炼制速度 +${speedPct}%（手动炼制与贤者指定均生效）。`
+        : '每拥有 1 种中等贤者之石，炼制速度 +15%，最多 +60%。'
+    }</div>`;
+  pane.appendChild(spdInfo);
 
   const pureInfo = document.createElement('div');
   pureInfo.className = 'codex-item ' + (state.pureSageOwned ? 'known' : 'unknown');
@@ -797,6 +823,22 @@ function renderTier2() {
   s1.className = 'codex-section';
   s1.textContent = '贤 者 进 阶';
   pane.appendChild(s1);
+
+  /* ★ 新增：显示当前炼制加速 */
+  const speedPct = Math.round((midSageSpeedMult() - 1) * 100);
+  const spdInfo = document.createElement('div');
+  spdInfo.className = 'upg' + (state.midSageVariants.size > 0 ? ' mid' : '');
+  spdInfo.innerHTML = `
+    <span class="upg-icon">⏩</span>
+    <div class="upg-body">
+      <div class="upg-name">中等贤者之石 · 炼制加速</div>
+      <div class="upg-desc">${
+        state.midSageVariants.size > 0
+          ? `当前拥有 ${state.midSageVariants.size} 种，炼制速度 <b style="color:#e0c0ff">+${speedPct}%</b>（手动炼制与贤者指定均生效）。`
+          : '每拥有 1 种中等贤者之石，炼制速度 +15%，最多 +60%。'
+      }</div>
+    </div>`;
+  pane.appendChild(spdInfo);
 
   const wisdomQty = perfectWisdomCount();
 
@@ -1298,6 +1340,7 @@ function updateSageCraftButton() {
   }
 
   scCraftBtn.disabled = false;
+  const speedPct = Math.round((midSageSpeedMult() - 1) * 100);
   let status = `将炼制：【${vTxt}】${def.name}`;
   if (!isSagePotion) status += '（完美品质）';
   if (target.variant === 'mysterious' && !isSagePotion) {
@@ -1305,6 +1348,9 @@ function updateSageCraftButton() {
   }
   if (isSagePotion) {
     status += ' · 变种任选，不消耗贤者之石';
+  }
+  if (speedPct > 0) {
+    status += ` · 加速 +${speedPct}%`;
   }
   scStatus.textContent = status;
 }
@@ -1362,12 +1408,14 @@ function startSageCraft() {
 
   const vd = VARIANTS[targetVariant];
   const vTxt = vd.name ? `${vd.icon}${vd.name}` : '标准';
-  log(`🟣 贤者指定炼制：【${vTxt}】${def.name} ……`);
+  const speedPct = Math.round((midSageSpeedMult() - 1) * 100);
+  log(`🟣 贤者指定炼制：【${vTxt}】${def.name} ……${speedPct > 0 ? `（加速 +${speedPct}%）` : ''}`);
 
   let prog = 0;
+  const speed = midSageSpeedMult();
   const tick = () => {
     if (!brew.active || !brew.isSageCraft) return;
-    prog += 4;
+    prog += 4 * speed;
     brew.progress = Math.min(100, prog);
     safe(renderBrewUI, 'renderBrewUI');
     if (prog < 100) setTimeout(tick, 40);
@@ -1849,7 +1897,8 @@ function brewLoop(ts) {
 
   const overheat = brew.temp > 92;
   let pr;
-  if (isIn) pr = 38 * sageMult();
+  /* ★ 中等贤者之石加速手动炼制 */
+  if (isIn) pr = 38 * sageMult() * midSageSpeedMult();
   else if (overheat) pr = -55;
   else pr = -20;
   brew.progress = Math.max(0, Math.min(100, brew.progress + pr * dt));
@@ -2166,6 +2215,9 @@ function craftMidSage(sageVariant) {
     showEventBanner('🟣 中等贤者之石诞生！', 'mid');
     log(`✨✨ 炼制成功！获得【${vLabel}中等贤者之石】`, 'mid');
     log('🟣 现在可以在坩埚下方的「贤者指定」中指定任意药剂与变种炼制。', 'sage');
+    log('🔮 「神秘的」变种已可在贤者指定中主动炼制（80% 成功率）。', 'sage');
+    const spd = Math.round((midSageSpeedMult() - 1) * 100);
+    log(`⏩ 炼制加速 +${spd}%。`, 'sage');
     log('🔴 初级贤者之石选择器已隐藏。', 'sage');
     if (!SAGE_ALLOWED_VARIANTS.includes(state.activeSageVariant)) state.activeSageVariant = sageVariant;
   } else {
@@ -2857,10 +2909,12 @@ if (loaded) {
   log('选取 2~3 种材料投入坩埚，点击「调配」开始。');
   log('❄️🔥 投料顺序会偏移舒适区，温度控制决定药剂变种。');
   log('💫 炼制过程中，舒适区会随机漂移——留意绿色温度带。');
-  log('🔮 每 100 次炼药约有 3 次会自行踏入神秘的小径。');
+  log('🔮 每 100 次炼药约有 8 次会自行踏入神秘的小径。');
+  log('🔮 拥有中等贤者之石后，即可在贤者指定中直接炼制“神秘的”（80% 成功率）。');
   log('✨ 连续炼出 5 瓶相同药剂，可累积"纯净"概率。贤者指定炼制同样可以触发。');
   log('💧 重炼：把已有药水送上重炼台（🔄），60% 转为提神的。');
   log('🟣 集齐初级贤者之石与完美智慧药剂，可炼制中等贤者之石。');
+  log('⏩ 每拥有 1 种中等贤者之石，炼制速度 +15%（最多 +60%）。');
   log('🟣 拥有中等贤者之石后，初级贤者之石选择器将隐藏，改用「贤者指定」。');
   log('🔴 贤者指定炼制初级贤者之石时，标准 / 温和 / 炽热 / 疯狂四种变种可任选其一。');
   log('💠 集齐 4 种中等贤者之石，可炼制纯净的初等贤者之石——解锁「纯净」指定。');

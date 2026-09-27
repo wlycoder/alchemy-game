@@ -53,6 +53,12 @@ const SAGE_CRAFT = {
   finalSageMysteryChance: 0.8,   // 神秘的炼制成功率（80%）
 };
 
+/* ★ 中等贤者之石数量带来的炼制加速 */
+const MID_SAGE_SPEED = {
+  perStone: 0.15,   // 每拥有 1 种中等贤者之石，炼制速度 +15%
+  max: 0.6,         // 最多 +60%（4 种时）
+};
+
 const RECIPES = [
   { id:'heal',     name:'治疗药水', icon:'🧪', price:50,  mats:['herb','water'],               hint:'植物与水，生命之始' },
   { id:'strength', name:'力量药剂', icon:'💪', price:60,  mats:['mushroom','fire'],            hint:'火光炙烤着阴暗的菌类' },
@@ -250,7 +256,7 @@ const ZONE_DRIFT = {
   shiftMax: 17,
 };
 
-const MYSTERIOUS_CHANCE = 0.03;
+const MYSTERIOUS_CHANCE = 0.08;
 const PURE_STREAK = { required: 5, baseChance: 0.5, increment: 0.1, maxChance: 0.95 };
 const REFINE_CHANCE = 0.6;
 
@@ -260,11 +266,12 @@ const VARIANT_TIPS = [
   { v:'refreshing', tip:'📖 变种手册：「提神的」——将已炼成的药水重新投入坩埚重炼，60% 概率转化为提神的；失败则原样退回。' },
   { v:'mad',        tip:'📖 变种手册：「疯狂的」——频繁逃出舒适区（≥4 次）就会癫狂。' },
   { v:'pure',       tip:'📖 变种手册：「纯净的」——连续炼出 5 瓶相同药剂后，下一瓶有 50% 概率成为纯净；失败则概率 +10%，成功则清零重来。' },
-  { v:'mysterious', tip:'📖 变种手册：「神秘的」——可遇不可求。每 100 次炼药约有 3 次会自行踏入这条小径。' },
+  { v:'mysterious', tip:'📖 变种手册：「神秘的」——每 100 次炼药约有 8 次会自行踏入这条小径。拥有中等贤者之石后，可在贤者炼制中直接指定。' },
   { v:'midsage',    tip:'📖 贤者进阶：1 个初级贤者之石 + 1 瓶完美品质智慧药剂，可炼制中等贤者之石，30% 失败率。' },
   { v:'sagecraft',  tip:'📖 贤者指定：持有中等贤者之石后，可指定任意药剂与变种，投入任意 2 种材料直接炼制（完美品质）。' },
   { v:'puresage',   tip:'📖 纯净贤者：集齐 4 种中等贤者之石后，消耗 1 瓶纯净的万灵药 + 4 瓶完美品质智慧药剂，可炼制纯净的初等贤者之石。' },
-  { v:'finalsage',  tip:'📖 贤者之极：4 种中等贤者之石 + 1 个纯净的初等贤者之石 + 1 瓶睿智药剂 + 1 瓶任意神秘的药剂。最终贤者之石可指定任意变种；选择神秘的时 30% 成功率，失败则得到随机药剂的随机变种。' },
+  { v:'finalsage',  tip:'📖 贤者之极：4 种中等贤者之石 + 1 个纯净的初等贤者之石 + 1 瓶睿智药剂 + 1 瓶任意神秘的药剂。最终贤者之石可指定任意变种；选择神秘的时 80% 成功率，失败则得到随机药剂的随机变种。' },
+  { v:'midsagespeed', tip:'📖 贤者加速：每拥有 1 种中等贤者之石，炼制速度 +15%（最多 +60%），手动炼制与贤者指定炼制均生效。' },
 ];
 
 const ACHIEVEMENTS = [
