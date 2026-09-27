@@ -66,17 +66,17 @@ const WORLD = {
   description:
     '艾瑟瑞亚坐落于两条灵脉交汇的峡谷。泉水含银，矿石含金，月光草在满月之夜遍地开花。' +
     '在这座城市里，炼金术不只是技艺，更是一种信仰——火与水，是万物之始；贤者之石，是通往真理的阶梯。' +
-    '而每一位药剂师的声誉，都记录在《炼金日报》之上，被传颂，或被鞭挞。',
+    '而每一位药剂师的声誉，都记录在城中的闲谈之上，被传颂，或被鞭挞。',
   motto: '火与水，是万物之始；声誉如薄冰，行之慎之。',
 };
 
 /* ============================================================
-   ★ 新闻池（与环境新闻——内容随声誉变化）
+   ★ 环境新闻池
    ============================================================ */
 const AMBIENT_NEWS = {
   good: [
-    { title:'炼金新星', text:'《炼金日报》讯：城中一位年轻药剂师的声名正如日中天，贵族与商会皆争相拜访。', kind:'good' },
-    { title:'药剂畅销', text:'近来工坊的药水供不应求，市民排起长队，只为求购一瓶良药。', kind:'good' },
+    { title:'城中最热的话题', text:'城中最近有了一位口碑极佳的药剂师，贵族与商会皆争相拜访。', kind:'good' },
+    { title:'供不应求', text:'近来工坊的药水供不应求，市民排起长队，只为求购一瓶良药。', kind:'good' },
     { title:'月华草丰收', text:'满月之夜过后，月光草在城郊遍地盛开，采集者们欣喜若狂。', kind:'good' },
     { title:'贤者传闻', text:'有传言称，某位炼金术士正踏上贤者之路，或将成为数十年来的第一人。', kind:'good' },
   ],
@@ -193,7 +193,6 @@ const CLIENTS = {
 
 const CHAINS = [
   {
-    /* ★ 生病的妻子：全局只出现一次；变种影响剧情走向 */
     id:'sick_wife', title:'生病的妻子', client:'farmer', chainClass:'', once:true,
     steps:[
       { potion:'heal', qty:1, variant:'any',
@@ -229,8 +228,8 @@ const CHAINS = [
     ]
   },
   {
-    /* ★ 新增：发明家之梦——三阶段，要求智慧药剂与睿智药剂 */
-    id:'inventor_dream', title:'发明家之梦', client:'alchemist', chainClass:'dream',
+    /* ★ 发明家之梦：全局仅一次 */
+    id:'inventor_dream', title:'发明家之梦', client:'alchemist', chainClass:'dream', once:true,
     steps:[
       { potion:'wisdom',   qty:1, variant:'any',
         text:'我在研制一种能解析万物结构的装置，需要智慧药剂作为核心能源。' },
@@ -308,6 +307,19 @@ const MYSTERIOUS_CHANCE = 0.08;
 const PURE_STREAK = { required: 5, baseChance: 0.5, increment: 0.1, maxChance: 0.95 };
 const REFINE_CHANCE = 0.6;
 
+/* ★ 材料价格浮动：声誉与剧情影响 */
+const PRICE_MOD = {
+  repTiers: [
+    { at: 500, mult: 0.70 },
+    { at: 300, mult: 0.80 },
+    { at: 150, mult: 0.90 },
+    { at: 60,  mult: 0.95 },
+    { at: -20, mult: 1.25 },
+    { at: -60, mult: 1.50 },
+  ],
+  warHotIng: { sulfur: 1.8, thunder: 1.8 },
+};
+
 const VARIANT_TIPS = [
   { v:'gentle',     tip:'📖 变种手册：「温和的」——全程均温保持在 48° 以下即可。' },
   { v:'burning',    tip:'📖 变种手册：「炽热的」——全程均温保持在 63° 以上即可。' },
@@ -322,6 +334,8 @@ const VARIANT_TIPS = [
   { v:'midsagespeed', tip:'📖 贤者加速：每拥有 1 种中等贤者之石，炼制速度 +15%（最多 +60%），手动炼制与贤者指定炼制均生效。' },
   { v:'tier2variant', tip:'📖 二级加工：二阶药剂的变种会继承你最近一次贤者指定炼制所选的变种（"神秘的"除外）；未指定时则继承基础药剂的变种。' },
   { v:'orderchoice',  tip:'📖 订单变种：大多数订单不限变种。提交时可自行选择投入哪种变种，不同的变种会悄然改变剧情的走向。' },
+  { v:'materialprice',tip:'📖 材料行情：材料价格随你的声誉涨落——声誉越高，进货越便宜；声誉越低，奸商越猖狂。' },
+  { v:'storybranch',  tip:'📖 命运岔路：某些委托的变种选择会改写这座城市的命运，也会改变订单的流向。' },
 ];
 
 const ACHIEVEMENTS = [
@@ -373,9 +387,12 @@ const ACHIEVEMENTS = [
     check: s => s.stats.variantsSeen.has('pure') },
   { id:'refiner',        name:'重炼师',   icon:'💧', desc:'重炼出「提神的」变种',
     check: s => s.stats.variantsSeen.has('refreshing') && s.stats.refineCount >= 1 },
-  /* ★ 新增成就 */
   { id:'good_doctor',    name:'仁心仁术', icon:'⚕️', desc:'以温和之药救治农夫的妻子',
     check: s => s.stats.goodDoctorFlag === true },
   { id:'dream_maker',    name:'梦想共筑', icon:'💡', desc:'完成【发明家之梦】委托链',
     check: s => s.stats.chainsDone.has('inventor_dream') },
+  { id:'maker_sage',     name:'制造贤者', icon:'🏰', desc:'见证「万用颗粒」的诞生',
+    check: s => s.storyFlags && s.storyFlags.inventorGenius === true },
+  { id:'war_maker',      name:'战火引线', icon:'🔥', desc:'见证「真正的战争」',
+    check: s => s.storyFlags && s.storyFlags.inventorWar === true },
 ];
