@@ -22,6 +22,8 @@
       <div class="stat sage">🧙 <b id="merchantEta">--</b></div>
     </div>
     <div class="header-actions">
+      <button class="mini-btn" id="finalCraftBtn" title="最终炼制" style="display:none">🌟</button>
+      <button class="mini-btn" id="updateBtn" title="更新说明">📢</button>
       <button class="mini-btn" id="saveBtn" title="保存进度">💾</button>
       <button class="mini-btn" id="resetBtn" title="重置游戏">🔄</button>
     </div>
@@ -109,6 +111,12 @@
     <div class="shelf" id="shelf"></div>
   </section>
 
+  <!-- ★ 新闻栏 -->
+  <section class="panel news-panel">
+    <h2>📰 炼 金 日 报　<small>艾瑟瑞亚 · 城中见闻</small></h2>
+    <div class="news-list" id="newsList"></div>
+  </section>
+
   <section class="panel log-panel">
     <div class="log" id="log"></div>
   </section>
@@ -131,6 +139,67 @@
       <button class="btn" id="mDecline">谢 绝</button>
     </div>
     <div class="m-timer"><i id="mTimerBar"></i></div>
+  </div>
+</div>
+
+<!-- 更新说明浮窗 -->
+<div class="update-modal" id="updateModal">
+  <div class="update-card">
+    <div class="update-head">
+      <span class="u-icon">📢</span>
+      <span class="u-title">更 新 说 明</span>
+      <button class="u-close" id="updateClose" title="关闭">✕</button>
+    </div>
+    <div class="update-body" id="updateBody">加载中…</div>
+  </div>
+</div>
+
+<!-- 最终炼制浮窗 -->
+<div class="final-craft-modal" id="finalCraftModal">
+  <div class="final-craft-card">
+    <div class="fc-head">
+      <span class="fc-icon">🌟</span>
+      <span class="fc-title">最 终 炼 制</span>
+      <button class="fc-close" id="finalCraftClose" title="关闭">✕</button>
+    </div>
+    <div class="fc-body">
+      <div class="fc-intro">
+        以最终贤者之石为核，将坩埚中的材料瞬间凝练为完美药剂——<br>
+        <b style="color:#ffdca0">必定成功，必定完美品质</b>。
+      </div>
+      <div class="fc-section">
+        <div class="fc-label">① 选 择 变 种</div>
+        <div class="fc-variants" id="fcVariants"></div>
+      </div>
+      <div class="fc-section">
+        <div class="fc-label">② 选 择 药 剂</div>
+        <div class="fc-potions" id="fcPotions"></div>
+      </div>
+      <div class="fc-section">
+        <div class="fc-label">③ 坩 埚 材 料</div>
+        <div class="fc-materials" id="fcMaterials"></div>
+      </div>
+      <div class="fc-status" id="fcStatus">请选择药剂</div>
+      <button class="fc-start-btn" id="finalCraftStartBtn" disabled>开 始 最 终 炼 制</button>
+      <div class="fc-progress" id="fcProgress"><i></i></div>
+    </div>
+  </div>
+</div>
+
+<!-- ★ 订单交付：变种选择浮窗 -->
+<div class="deliver-modal" id="deliverModal">
+  <div class="deliver-card">
+    <div class="deliver-head">
+      <span class="d-icon">📜</span>
+      <span class="d-title">选 择 提 交 的 变 种</span>
+      <button class="d-close" id="deliverClose" title="关闭">✕</button>
+    </div>
+    <div class="deliver-body">
+      <div class="d-order-info" id="deliverOrderInfo"></div>
+      <div class="d-variants" id="deliverVariants"></div>
+      <div class="d-hint">不同变种会悄然影响剧情走向。</div>
+      <button class="d-confirm-btn" id="deliverConfirm" disabled>确 认 提 交</button>
+    </div>
   </div>
 </div>
 

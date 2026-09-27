@@ -47,16 +47,51 @@ const FINAL_SAGE = {
   price: 20000,
 };
 
-/* 贤者指定炼制配置 */
 const SAGE_CRAFT = {
-  minMaterials: 2,               // 至少投入 2 种材料
-  finalSageMysteryChance: 0.8,   // 神秘的炼制成功率（80%）
+  minMaterials: 2,
+  finalSageMysteryChance: 0.8,
 };
 
-/* ★ 中等贤者之石数量带来的炼制加速 */
 const MID_SAGE_SPEED = {
-  perStone: 0.15,   // 每拥有 1 种中等贤者之石，炼制速度 +15%
-  max: 0.6,         // 最多 +60%（4 种时）
+  perStone: 0.15,
+  max: 0.6,
+};
+
+/* ============================================================
+   ★ 世界观
+   ============================================================ */
+const WORLD = {
+  name: '艾瑟瑞亚',
+  subtitle: '群山环抱的炼金之城',
+  description:
+    '艾瑟瑞亚坐落于两条灵脉交汇的峡谷。泉水含银，矿石含金，月光草在满月之夜遍地开花。' +
+    '在这座城市里，炼金术不只是技艺，更是一种信仰——火与水，是万物之始；贤者之石，是通往真理的阶梯。' +
+    '而每一位药剂师的声誉，都记录在《炼金日报》之上，被传颂，或被鞭挞。',
+  motto: '火与水，是万物之始；声誉如薄冰，行之慎之。',
+};
+
+/* ============================================================
+   ★ 新闻池（与环境新闻——内容随声誉变化）
+   ============================================================ */
+const AMBIENT_NEWS = {
+  good: [
+    { title:'炼金新星', text:'《炼金日报》讯：城中一位年轻药剂师的声名正如日中天，贵族与商会皆争相拜访。', kind:'good' },
+    { title:'药剂畅销', text:'近来工坊的药水供不应求，市民排起长队，只为求购一瓶良药。', kind:'good' },
+    { title:'月华草丰收', text:'满月之夜过后，月光草在城郊遍地盛开，采集者们欣喜若狂。', kind:'good' },
+    { title:'贤者传闻', text:'有传言称，某位炼金术士正踏上贤者之路，或将成为数十年来的第一人。', kind:'good' },
+  ],
+  neutral: [
+    { title:'城郊集市', text:'城郊集市熙熙攘攘，商人们兜售着各式草药与矿石。', kind:'info' },
+    { title:'灵脉微涌', text:'近日灵脉轻微涌动，采集者称泉水品质略有提升。', kind:'info' },
+    { title:'学徒招募', text:'炼金公会发布公告，正在招募新的学徒。', kind:'info' },
+    { title:'夜色安宁', text:'入夜后城中一片寂静，唯有工坊的炉火微微跃动。', kind:'info' },
+  ],
+  bad: [
+    { title:'人心惶惶', text:'近日城中流言四起，市民们对某些药剂师避之不及。', kind:'bad' },
+    { title:'公会警告', text:'炼金公会发出警告：近期有药剂师涉嫌滥用癫狂之药，扰乱了城中秩序。', kind:'bad' },
+    { title:'卫兵盘查', text:'卫兵在城中加强了巡逻，据说正在追查一批来路不明的药剂。', kind:'bad' },
+    { title:'矿区枯竭', text:'硫磺矿区传出消息，矿工们的挖掘日益艰难，物价随之上涨。', kind:'bad' },
+  ],
 };
 
 const RECIPES = [
@@ -158,51 +193,64 @@ const CLIENTS = {
 
 const CHAINS = [
   {
-    id:'sick_wife', title:'生病的妻子', client:'farmer', chainClass:'',
+    /* ★ 生病的妻子：全局只出现一次；变种影响剧情走向 */
+    id:'sick_wife', title:'生病的妻子', client:'farmer', chainClass:'', once:true,
     steps:[
-      { potion:'heal', qty:1, variant:'standard', text:'我妻子病了，需要一瓶治疗药水……' },
-      { potion:'heal', qty:1, variant:'gentle',   text:'她好多了，但医生说药性要温和些才行。' },
-      { potion:'heal', qty:2, variant:'standard', text:'她痊愈了！村里人都说您是活菩萨。', bonusRep:40 },
+      { potion:'heal', qty:1, variant:'any',
+        text:'我妻子病了，需要一瓶治疗药水……请您务必救救她。' },
     ]
   },
   {
     id:'mercenary_mission', title:'佣兵的任务', client:'mercenary', chainClass:'',
     steps:[
-      { potion:'strength', qty:1, variant:'standard', text:'先来瓶力量药剂，老子要冲锋。' },
+      { potion:'strength', qty:1, variant:'any', text:'先来瓶力量药剂，老子要冲锋。' },
       { potion:'strength', qty:1, variant:'burning',  text:'再来一瓶，要够烈的！', bonusGold:120 },
     ]
   },
   {
     id:'noble_feast', title:'贵族的晚宴', client:'noble', chainClass:'',
     steps:[
-      { potion:'moonlight', qty:1, variant:'standard', text:'晚宴上需要些助兴的东西。' },
+      { potion:'moonlight', qty:1, variant:'any', text:'晚宴上需要些助兴的东西。' },
       { potion:'moonlight', qty:1, variant:'pure',     text:'上次的尚可，这次我要最好的。', bonusGold:200, bonusRep:50 },
     ]
   },
   {
     id:'stranger_deal', title:'神秘人的委托', client:'stranger', chainClass:'',
     steps:[
-      { potion:'poison', qty:1, variant:'standard', text:'一瓶剧毒药剂，别问。' },
+      { potion:'poison', qty:1, variant:'any', text:'一瓶剧毒药剂，别问。' },
       { potion:'poison', qty:1, variant:'mad',      text:'还不够……再疯一点。', bonusGold:300 },
     ]
   },
   {
     id:'alchemist_study', title:'炼金术士的研究', client:'alchemist', chainClass:'',
     steps:[
-      { potion:'storm', qty:1, variant:'refreshing', text:'我要研究稳定温度下的雷暴。' },
+      { potion:'storm', qty:1, variant:'any', text:'我要研究稳定温度下的雷暴。' },
       { potion:'static', qty:1, variant:'mad',       text:'那么，再给我一瓶疯狂点的静电。', bonusRep:30 },
+    ]
+  },
+  {
+    /* ★ 新增：发明家之梦——三阶段，要求智慧药剂与睿智药剂 */
+    id:'inventor_dream', title:'发明家之梦', client:'alchemist', chainClass:'dream',
+    steps:[
+      { potion:'wisdom',   qty:1, variant:'any',
+        text:'我在研制一种能解析万物结构的装置，需要智慧药剂作为核心能源。' },
+      { potion:'t2wisdom', qty:1, variant:'any',
+        text:'原型成功了！但能量场极不稳定，我需要睿智药剂来校准它。' },
+      { potion:'t2wisdom', qty:1, variant:'any',
+        text:'最后一步——把它推向极限。请再给我一瓶睿智药剂。',
+        bonusGold:600, bonusRep:80 },
     ]
   },
   {
     id:'plague', title:'瘟疫蔓延', client:'healer', chainClass:'plague',
     steps:[
-      { potion:'heal', qty:2, variant:'standard',
+      { potion:'heal', qty:2, variant:'any',
         text:'医生！镇上的病人越来越多，先给我两瓶治疗药水应急！' },
-      { potion:'elixir', qty:1, variant:'standard',
+      { potion:'elixir', qty:1, variant:'any',
         text:'普通药剂已经压不住瘟疫了……只有万灵药才能救他们。' },
       { potion:'elixir', qty:1, variant:'pure',
         text:'万灵药起效了！但疫源未除，我需要一瓶纯净的万灵药做解药配方。', bonusGold:300 },
-      { potion:'t2elixir', qty:1, variant:'standard',
+      { potion:'t2elixir', qty:1, variant:'any',
         text:'这是最后一战——生命之泉能净化整条水源。拜托了。',
         bonusGold:800, bonusRep:120 },
     ]
@@ -212,9 +260,9 @@ const CHAINS = [
     steps:[
       { potion:'strength', qty:2, variant:'burning',
         text:'边境告急。士兵们需要最烈的力量药剂。' },
-      { potion:'t2dragon', qty:1, variant:'standard',
+      { potion:'t2dragon', qty:1, variant:'any',
         text:'敌军有巨龙助阵。给我一瓶龙神之怒，我们要以龙制龙。', bonusGold:400 },
-      { potion:'t2elixir', qty:1, variant:'standard',
+      { potion:'t2elixir', qty:1, variant:'any',
         text:'伤亡惨重，生命之泉能救回大半伤员。' },
       { potion:'t2dragon', qty:1, variant:'mad',
         text:'决战在即。给我一瓶疯狂的龙神之怒——我要让敌人记住今天。',
@@ -270,8 +318,10 @@ const VARIANT_TIPS = [
   { v:'midsage',    tip:'📖 贤者进阶：1 个初级贤者之石 + 1 瓶完美品质智慧药剂，可炼制中等贤者之石，30% 失败率。' },
   { v:'sagecraft',  tip:'📖 贤者指定：持有中等贤者之石后，可指定任意药剂与变种，投入任意 2 种材料直接炼制（完美品质）。' },
   { v:'puresage',   tip:'📖 纯净贤者：集齐 4 种中等贤者之石后，消耗 1 瓶纯净的万灵药 + 4 瓶完美品质智慧药剂，可炼制纯净的初等贤者之石。' },
-  { v:'finalsage',  tip:'📖 贤者之极：4 种中等贤者之石 + 1 个纯净的初等贤者之石 + 1 瓶睿智药剂 + 1 瓶任意神秘的药剂。最终贤者之石可指定任意变种；选择神秘的时 80% 成功率，失败则得到随机药剂的随机变种。' },
+  { v:'finalsage',  tip:'📖 贤者之极：4 种中等贤者之石 + 1 个纯净的初等贤者之石 + 1 瓶睿智药剂 + 1 瓶任意神秘的药剂。最终贤者之石可指定任意变种；选择神秘的时 80% 成功率。' },
   { v:'midsagespeed', tip:'📖 贤者加速：每拥有 1 种中等贤者之石，炼制速度 +15%（最多 +60%），手动炼制与贤者指定炼制均生效。' },
+  { v:'tier2variant', tip:'📖 二级加工：二阶药剂的变种会继承你最近一次贤者指定炼制所选的变种（"神秘的"除外）；未指定时则继承基础药剂的变种。' },
+  { v:'orderchoice',  tip:'📖 订单变种：大多数订单不限变种。提交时可自行选择投入哪种变种，不同的变种会悄然改变剧情的走向。' },
 ];
 
 const ACHIEVEMENTS = [
@@ -323,4 +373,9 @@ const ACHIEVEMENTS = [
     check: s => s.stats.variantsSeen.has('pure') },
   { id:'refiner',        name:'重炼师',   icon:'💧', desc:'重炼出「提神的」变种',
     check: s => s.stats.variantsSeen.has('refreshing') && s.stats.refineCount >= 1 },
+  /* ★ 新增成就 */
+  { id:'good_doctor',    name:'仁心仁术', icon:'⚕️', desc:'以温和之药救治农夫的妻子',
+    check: s => s.stats.goodDoctorFlag === true },
+  { id:'dream_maker',    name:'梦想共筑', icon:'💡', desc:'完成【发明家之梦】委托链',
+    check: s => s.stats.chainsDone.has('inventor_dream') },
 ];
