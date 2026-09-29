@@ -40,7 +40,7 @@ const state = {
   },
 };
 
-for (const id in ING) { state.stock[id] = ING[id].max; state.acc[id] = 0; }
+for (const id in ING) { state.stock[id] = ING_START_STOCK; state.acc[id] = 0; }
 for (const u of UPGRADES) state.upgrades[u.id] = 0;
 
 const brew = {
@@ -169,6 +169,11 @@ function hasSage() {
 }
 function hasPrimarySage() { return state.sageVariants.size > 0; }
 function hasMidSage() { return state.midSageVariants.size > 0; }
+
+/* ★ 材料自动恢复：需先获得过中等贤者之石才会解锁 */
+function gatherUnlocked() {
+  return state.midSageVariants.size > 0 || state.pureSageOwned || state.finalSageOwned;
+}
 
 function pickSageVariantFor() {
   if (state.sageVariants.has(state.activeSageVariant)) return state.activeSageVariant;
@@ -475,6 +480,9 @@ function checkAchievements() {
         state.achievements.add(a.id);
         showAchievementPopup(a);
         log(`🏆 成就达成【${a.name}】：${a.desc}`, 'sage');
+        /* ★ 成就会在城中见闻栏留下报道 */
+        const news = ACH_NEWS[a.id];
+        if (news) addNews(news.title, news.text, news.kind);
         changed = true;
       }
     } catch (e) {}
@@ -519,6 +527,7 @@ function renderMerchantEta() {
   }
 }
 function renderIngredients() {
+  const gatherOk = gatherUnlocked();
   for (const id in ING) {
     const n = state.stock[id], el = ingEls[id];
     if (!el) continue;
@@ -529,7 +538,9 @@ function renderIngredients() {
     const hasRefine = !!state.cauldronPotion;
     const gameActive = primaryGame.active || midGame.active;
     el.btn.disabled = (n <= 0) || brew.active || hasRefine || gameActive;
-    el.bar.style.width = (n >= ING[id].max) ? '0%' : Math.min(100, state.acc[id] * 100) + '%';
+    el.btn.classList.toggle('gather-locked', !gatherOk);
+    el.btn.title = gatherOk ? '' : '🔒 获得中等贤者之石后解锁材料自动恢复';
+    el.bar.style.width = (!gatherOk || n >= ING[id].max) ? '0%' : Math.min(100, state.acc[id] * 100) + '%';
     el.buy.classList.toggle('off', n >= ING[id].max || brew.active || hasRefine || gameActive);
   }
 }
@@ -826,6 +837,20 @@ function renderCodex() {
         : '每拥有 1 种中等贤者之石，炼制速度 +15%，最多 +60%。'
     }</div>`;
   pane.appendChild(spdInfo);
+
+  const gatherInfo = document.createElement('div');
+  gatherInfo.className = 'codex-item ' + (gatherUnlocked() ? 'known' : 'unknown');
+  gatherInfo.innerHTML = `
+    <div class="codex-head">
+      <span class="ci-icon">🌾</span>
+      <span class="ci-name">材料采集</span>
+    </div>
+    <div class="codex-body">${
+      gatherUnlocked()
+        ? '✅ 已解锁。采集者会持续为你补货，材料数量会随时间自动恢复。'
+        : '🔒 尚未解锁。获得中等贤者之石后，采集者才会为你持续补货。'
+    }</div>`;
+  pane.appendChild(gatherInfo);
 
   const pureInfo = document.createElement('div');
   pureInfo.className = 'codex-item ' + (state.pureSageOwned ? 'known' : 'unknown');
@@ -3266,16 +3291,21 @@ function loop(t) {
   if (etaAcc >= 250) { renderMerchantEta(); etaAcc = 0; }
 
   if (!state.merchant.active) {
-    const gm = gatherMult();
-    for (const id in ING) {
-      if (state.stock[id] < ING[id].max) {
-        state.acc[id] += dt / (ING[id].rate / gm);
-        while (state.acc[id] >= 1 && state.stock[id] < ING[id].max) {
-          state.acc[id] -= 1;
-          state.stock[id]++;
-        }
-        if (state.stock[id] >= ING[id].max) state.acc[id] = 0;
-      } else state.acc[id] = 0;
+    /* ★ 材料自动恢复：获得中等贤者之石后才解锁 */
+    if (gatherUnlocked()) {
+      const gm = gatherMult();
+      for (const id in ING) {
+        if (state.stock[id] < ING[id].max) {
+          state.acc[id] += dt / (ING[id].rate / gm);
+          while (state.acc[id] >= 1 && state.stock[id] < ING[id].max) {
+            state.acc[id] -= 1;
+            state.stock[id]++;
+          }
+          if (state.stock[id] >= ING[id].max) state.acc[id] = 0;
+        } else state.acc[id] = 0;
+      }
+    } else {
+      for (const id in ING) state.acc[id] = 0;
     }
     if (orderAcc >= 200) {
       safe(() => tickOrders(orderAcc), 'tickOrders');
@@ -3365,6 +3395,7 @@ if (loaded) {
   log(`——${WORLD.subtitle}——`);
   log('选取 2~3 种材料投入坩埚，点击「调配」开始。');
   log('🛒 将鼠标移到材料上，可看到当前买入价格。');
+  log('🌾 材料不会自行恢复——炼出中等贤者之石后，采集者才会为你持续补货。');
   log('🔴 投入火之精华、硫磺、月光草后，需通过「三元素锁定」小游戏炼制初级贤者之石。');
   log('🟣 拥有初级贤者之石后，可用「精准滴定」小游戏炼制中等贤者之石。');
   log('🌟 拥有中等或最终贤者之石后，进阶面板解锁，可进行贤者指定炼制。');

@@ -22,31 +22,35 @@ button, .btn, .tab, .mini-btn, .ing, .slot, .badge, .refine-btn,
 }
 
 :root{
-  --gold:#d4af37;--gold-l:#f5e6a8;
-  --panel:rgba(78,52,28,.55);
-  --bd:rgba(150,100,50,.42);
-  --text:#ecdfc8;--dim:#a89678;
-  --ok:#7ee787;--bad:#ff7b72;--warn:#e3b341;--violet:#b16cff;
-  --order-bg:#f0ddb0;
+  --gold:#e0b25c;--gold-l:#f7e2b0;
+  --panel:rgba(96,66,38,.55);
+  --bd:rgba(168,120,64,.45);
+  --text:#f0e3cb;--dim:#b09678;
+  --ok:#8fd97a;--bad:#e2705f;--warn:#e3b341;--violet:#c08fe8;
+  --order-bg:#efe0bc;
   --order-text:#3a2a1a;
   --order-dim:#7a6a50;
   --order-border:#b89868;
 
-  /* 中世纪小屋：木 + 石 + 蜡烛光 */
-  --wood-deep:#1a1008;
-  --wood-mid:#2e1e10;
-  --wood-light:#4a2f18;
-  --stone:#2a2620;
-  --candle:#e8b860;
-  --candle-soft:rgba(232,184,96,.4);
+  /* 中世纪小屋：橡木 + 粗石 + 烛光 + 铁艺 + 灰泥墙 */
+  --wood-deep:#241708;
+  --wood-mid:#3b2716;
+  --wood-light:#5b3d22;
+  --stone:#3a332a;
+  --candle:#f0c274;
+  --candle-soft:rgba(240,194,116,.42);
+  --plaster:#e8d6b0;
+  --plaster-dark:#c8b088;
+  --iron:#8a8478;
 }
 
 body{
   font-family:Georgia,"Songti SC","STSong",serif;
   background:
-    radial-gradient(ellipse at 50% 0%, rgba(232,184,96,.14) 0%, transparent 55%),
-    radial-gradient(ellipse at 15% 80%, rgba(120,70,30,.15) 0%, transparent 45%),
-    linear-gradient(180deg, #23180d 0%, #150c05 55%, #080503 100%);
+    radial-gradient(ellipse at 50% -5%, rgba(240,194,116,.20) 0%, transparent 55%),
+    radial-gradient(ellipse at 10% 88%, rgba(150,95,45,.22) 0%, transparent 46%),
+    radial-gradient(ellipse at 92% 92%, rgba(150,95,45,.18) 0%, transparent 44%),
+    linear-gradient(180deg, #2b1f14 0%, #1b130b 55%, #0b0704 100%);
   color:var(--text);min-height:100vh;padding:14px;display:flex;justify-content:center;
   overflow-x:hidden;
 }
@@ -69,18 +73,20 @@ header{
   display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
   padding:12px 20px;
   background:
-    linear-gradient(180deg, rgba(90,60,32,.65), rgba(48,30,14,.55)),
-    repeating-linear-gradient(90deg, rgba(0,0,0,.05) 0, rgba(0,0,0,.05) 1px, transparent 1px, transparent 4px);
-  border:1px solid rgba(170,120,65,.55);
-  border-radius:14px;
+    repeating-linear-gradient(90deg, rgba(0,0,0,.22) 0, rgba(0,0,0,.22) 10px, rgba(255,225,180,.05) 10px, rgba(255,225,180,.05) 12px),
+    linear-gradient(180deg, rgba(232,214,176,.10), rgba(52,34,18,.6)),
+    linear-gradient(180deg, rgba(98,68,38,.75), rgba(44,28,14,.7));
+  border:2px solid rgba(126,94,54,.75);
+  border-radius:12px;
   backdrop-filter:blur(10px);
   box-shadow:
-    0 0 40px rgba(160,110,60,.18) inset,
-    0 6px 22px rgba(0,0,0,.45),
-    inset 0 1px 0 rgba(255,200,140,.12);
+    0 0 0 3px rgba(24,16,8,.6),
+    0 0 46px rgba(200,150,80,.20) inset,
+    0 8px 26px rgba(0,0,0,.5),
+    inset 0 1px 0 rgba(255,220,170,.18);
 }
 h1{font-size:19px;font-weight:normal;letter-spacing:6px;color:var(--gold);
-   text-shadow:0 0 18px rgba(212,175,55,.65)}
+   text-shadow:0 0 18px rgba(224,178,92,.7),0 1px 0 rgba(0,0,0,.6)}
 .stats{display:flex;gap:14px;font-size:13px;flex-wrap:wrap;align-items:center}
 .stat{display:flex;align-items:center;gap:5px}
 .stat b{color:var(--gold-l);font-weight:normal;font-size:15px}
@@ -108,15 +114,16 @@ main{display:grid;grid-template-columns:1fr 1.1fr 1fr;gap:12px;align-items:start
 
 .panel{
   background:
-    linear-gradient(180deg, rgba(80,54,30,.55), rgba(46,28,14,.42)),
-    repeating-linear-gradient(0deg, rgba(0,0,0,.03) 0, rgba(0,0,0,.03) 1px, transparent 1px, transparent 3px);
-  border:1px solid rgba(150,100,50,.42);
-  border-radius:14px;padding:13px;
+    repeating-linear-gradient(90deg, rgba(0,0,0,.10) 0, rgba(0,0,0,.10) 1px, transparent 1px, transparent 24px),
+    linear-gradient(180deg, rgba(100,70,40,.62), rgba(48,32,17,.55));
+  border:1px solid rgba(150,105,60,.5);
+  border-radius:12px;padding:13px;
   backdrop-filter:blur(10px);display:flex;flex-direction:column;gap:10px;min-height:0;
   box-shadow:
-    0 4px 18px rgba(0,0,0,.35),
-    inset 0 1px 0 rgba(255,200,140,.08),
-    inset 0 -1px 0 rgba(0,0,0,.25);
+    0 5px 20px rgba(0,0,0,.45),
+    inset 0 0 30px rgba(180,120,60,.10),
+    inset 0 1px 0 rgba(255,215,165,.12),
+    inset 0 -1px 0 rgba(0,0,0,.3);
 }
 .panel h2{
   font-size:11.5px;letter-spacing:4px;color:var(--gold);font-weight:normal;
@@ -127,13 +134,13 @@ main{display:grid;grid-template-columns:1fr 1.1fr 1fr;gap:12px;align-items:start
 /* 材料架：木质橱柜 */
 main > .panel:first-child{
   background:
-    linear-gradient(180deg, rgba(110,70,36,.72), rgba(60,38,18,.62)),
-    repeating-linear-gradient(90deg, rgba(0,0,0,.06) 0, rgba(0,0,0,.06) 1px, transparent 1px, transparent 5px);
-  border-color:rgba(190,140,80,.55);
+    repeating-linear-gradient(90deg, rgba(0,0,0,.14) 0, rgba(0,0,0,.14) 2px, transparent 2px, transparent 34px),
+    linear-gradient(180deg, rgba(126,86,46,.8), rgba(66,43,22,.7));
+  border-color:rgba(190,140,80,.6);
   box-shadow:
-    0 0 30px rgba(140,90,40,.28) inset,
-    0 6px 22px rgba(0,0,0,.48),
-    inset 0 1px 0 rgba(255,210,150,.12);
+    0 0 34px rgba(150,95,45,.3) inset,
+    0 7px 24px rgba(0,0,0,.5),
+    inset 0 1px 0 rgba(255,215,160,.16);
 }
 main > .panel:first-child h2{
   color:#f0c878;
@@ -188,6 +195,12 @@ main > .panel:first-child h2{
 .ing .bar{position:absolute;left:0;right:0;bottom:0;height:2px;background:rgba(0,0,0,.28)}
 .ing .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#c8a060,#f0d080);
   box-shadow:0 0 8px rgba(240,208,128,.8)}
+/* ★ 未解锁自动恢复：进度条变为浅色虚线，并显示锁标记 */
+.ing.gather-locked .bar{background:repeating-linear-gradient(90deg,rgba(180,150,110,.35) 0 3px,transparent 3px 6px)}
+.ing.gather-locked .bar i{display:none}
+.ing.gather-locked::after{
+  content:'🔒';position:absolute;right:4px;bottom:3px;font-size:9px;opacity:.55;line-height:1;
+}
 
 .cauldron-stage{display:flex;align-items:center;justify-content:center;min-height:200px;position:relative}
 .cauldron{position:relative;width:200px;height:175px;transition:filter .3s}

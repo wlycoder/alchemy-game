@@ -14,7 +14,8 @@ const ING = {
   crystal:  { name:'水晶',     icon:'💎', rate:8000, max:3, price:46, temp:'neutral' },
   phoenix:  { name:'凤凰羽',   icon:'./assests/texture/materials/feather.png', rate:9500, max:2, price:60, temp:'hot' },
 };
-
+/* ★ 每种材料的初始库存数量 */
+const ING_START_STOCK = 10;
 const VARIANTS = {
   standard:   { name:'',     icon:'',  color:'#9aa0a6', mult:1.0 },
   gentle:     { name:'温和的', icon:'❄️', color:'#7ee787', mult:1.5 },
@@ -73,19 +74,62 @@ const AMBIENT_NEWS = {
     { title:'供不应求', text:'近来工坊的药水供不应求，市民排起长队，只为求购一瓶良药。', kind:'good' },
     { title:'月华草丰收', text:'满月之夜过后，月光草在城郊遍地盛开，采集者们欣喜若狂。', kind:'good' },
     { title:'贤者传闻', text:'有传言称，某位炼金术士正踏上贤者之路，或将成为数十年来的第一人。', kind:'good' },
+    { title:'学徒的榜样', text:'公会学堂里，先生们开始以某位新晋药剂师的事迹教导学徒：「初出茅庐，亦可有所成。」', kind:'good' },
+    { title:'完美的一瓶', text:'酒馆里有人吹嘘，自己亲眼见过一瓶品质完美的药剂——「那光泽，像是把月光封进了瓶子里。」', kind:'good' },
+    { title:'变种收藏热', text:'城中的收藏家们忽然对「变种药剂」趋之若鹜，据说一份罕见的变种能卖出天价。', kind:'good' },
+    { title:'贤者之路的见证者', text:'老炼金术士们在壁炉边感慨：此生竟能亲眼见到贤者之石再度现世，实属幸事。', kind:'good' },
+    { title:'工坊的灯火', text:'那座通宵亮着炉火的工坊，成了深夜里最温暖的风景，路过的旅人都会驻足片刻。', kind:'good' },
   ],
   neutral: [
     { title:'城郊集市', text:'城郊集市熙熙攘攘，商人们兜售着各式草药与矿石。', kind:'info' },
     { title:'灵脉微涌', text:'近日灵脉轻微涌动，采集者称泉水品质略有提升。', kind:'info' },
     { title:'学徒招募', text:'炼金公会发布公告，正在招募新的学徒。', kind:'info' },
     { title:'夜色安宁', text:'入夜后城中一片寂静，唯有工坊的炉火微微跃动。', kind:'info' },
+    { title:'壁炉闲谈', text:'酒馆的壁炉旁，旅人们交换着各地的见闻，也传颂着工坊里的新鲜事。', kind:'info' },
+    { title:'采集者的低语', text:'采集者们聚在屋檐下躲避夜雨，低声谈起近来矿石与草药的行情。', kind:'info' },
+    { title:'公会档案', text:'公会的书记官又在整理厚厚的档案，据说是为了记录城中一位药剂师的成长。', kind:'info' },
+    { title:'屋顶的猫', text:'一只橘猫卧在工坊的屋檐上打了个哈欠，晾着的香草随风轻晃。', kind:'info' },
   ],
   bad: [
     { title:'人心惶惶', text:'近日城中流言四起，市民们对某些药剂师避之不及。', kind:'bad' },
     { title:'公会警告', text:'炼金公会发出警告：近期有药剂师涉嫌滥用癫狂之药，扰乱了城中秩序。', kind:'bad' },
     { title:'卫兵盘查', text:'卫兵在城中加强了巡逻，据说正在追查一批来路不明的药剂。', kind:'bad' },
     { title:'矿区枯竭', text:'硫磺矿区传出消息，矿工们的挖掘日益艰难，物价随之上涨。', kind:'bad' },
+    { title:'墙上的告示', text:'城门口的告示墙上，有人贴出了一张针对「疯药滥售者」的警告书。', kind:'bad' },
+    { title:'灰色的传闻', text:'几个神秘人在巷尾低声交谈，提到某位药剂师的名字时，语气里满是忌惮。', kind:'bad' },
   ],
+};
+
+/* ★ 成就达成时，会在城中见闻栏留下对应报道 */
+const ACH_NEWS = {
+  first_potion:    { title:'新星初绽', text:'一位初出茅庐的学徒炼出了人生第一瓶药剂，街坊们笑着道贺。', kind:'good' },
+  first_perfect:   { title:'完美主义', text:'有人说，那座工坊里诞生了一瓶无可挑剔的药剂，品质之美令人惊叹。', kind:'good' },
+  variant_scholar: { title:'变种学者', text:'一位药剂师搜集了多种变种炼法，公会的学者对他的手记颇感兴趣。', kind:'good' },
+  variant_master:  { title:'变种大师', text:'七种变种尽数现世，这是连老一辈炼金术士都未曾做到的事。', kind:'good' },
+  sage_path:       { title:'贤者之路', text:'沉寂数十年的贤者之石，再度于艾瑟瑞亚的炉火中凝成——城为之震动。', kind:'good' },
+  sage_triad:      { title:'贤者三重', text:'三种变种的贤者之石齐聚工坊，学者们称之为「三重共鸣」。', kind:'good' },
+  mid_sage:        { title:'贤者进阶', text:'有人成功炼出了中等贤者之石，公会连夜派人登门求证。', kind:'good' },
+  mid_sage_all:    { title:'贤者大成', text:'四种中等贤者之石集于一处，老炼金术士们相顾无言，唯有热泪。', kind:'good' },
+  pure_sage:       { title:'纯净贤者', text:'纯净的初等贤者之石现世，那是通往真理阶梯的第一级。', kind:'good' },
+  final_sage:      { title:'贤者之极', text:'传说中通往万物本源的最终贤者之石，于今夜诞生。整座城彻夜未眠。', kind:'good' },
+  sage_crafter:    { title:'贤者之手', text:'那位药剂师已能随心所欲地以贤者之力炼制药剂，手法娴熟如行云流水。', kind:'good' },
+  merchant_friend: { title:'商人的朋友', text:'云游商人们口耳相传：城中有一位值得信赖的药剂师，与其交易从不吃亏。', kind:'good' },
+  rich:            { title:'炼金首富', text:'那座工坊的金库据说已堆满了金币，连商会也要侧目。', kind:'good' },
+  famous:          { title:'名满天下', text:'你的名字传遍了艾瑟瑞亚的大街小巷，孩童都能哼唱关于你的歌谣。', kind:'good' },
+  all_recipes:     { title:'炼金全典', text:'所有基础配方尽数被破解，公会将此记入了炼金典籍之中。', kind:'good' },
+  first_t2:        { title:'二次加工', text:'工坊里传出了「二次加工」成功的欢呼，稀有药剂不再是难题。', kind:'good' },
+  chain_master:    { title:'一诺千金', text:'一位老主顾逢人便夸：与那位药剂师约定的事，他从不食言。', kind:'good' },
+  mad_scientist:   { title:'疯狂科学家', text:'「疯狂的」变种横空出世，有人惊叹其巧思，也有人为其捏一把汗。', kind:'info' },
+  big_buyer:       { title:'大手笔', text:'采集者们最盼望见到那位药剂师——他收购材料从不含糊。', kind:'good' },
+  plague_hero:     { title:'瘟疫救星', text:'瘟疫退去，镇民们在教堂前为你点燃了一排感恩的蜡烛。', kind:'good' },
+  war_hero:        { title:'战争英雄', text:'边境捷报传回，士兵们说：多亏了那批药剂，我们才活着回来。', kind:'good' },
+  mystery_seeker:  { title:'神秘学者', text:'「神秘的」变种现世，占星师们说，那瓶药格里映着不属于凡间的星光。', kind:'good' },
+  pure_master:     { title:'纯净之心', text:'「纯净的」变种现世，据说那是心地澄澈者才能触及的境界。', kind:'good' },
+  refiner:         { title:'重炼师', text:'重炼之术让旧药焕发新生，工坊的地窖里堆满了等待重炼的瓶子。', kind:'good' },
+  good_doctor:     { title:'仁心仁术', text:'农夫的妻子痊愈了。村口的老槐树下，如今挂着一条写满感谢的布幡。', kind:'good' },
+  dream_maker:     { title:'梦想共筑', text:'发明家的装置终于转动起来，围观的人群爆发出一阵欢呼。', kind:'good' },
+  maker_sage:      { title:'制造贤者', text:'「万用颗粒」的诞生轰动了全城，人们开始重新想象炼金术的边界。', kind:'good' },
+  war_maker:       { title:'战火引线', text:'远方的地平线泛起不祥的红光，酒馆里关于战争的流言愈演愈烈。', kind:'bad' },
 };
 
 const RECIPES = [
@@ -134,7 +178,7 @@ const QUALITY = [
 ];
 
 const UPGRADES = [
-  { id:'gather', name:'采集加速', icon:'⏩', desc:'材料恢复速度 +25%', max:4, base:120, mult:1.7 },
+  { id:'gather', name:'采集加速', icon:'⏩', desc:'材料恢复速度 +25%（需中等贤者之石）', max:4, base:120, mult:1.7 },
   { id:'sell',   name:'炼金精通', icon:'💰', desc:'药水售价 +15%',     max:4, base:150, mult:1.7 },
   { id:'orders', name:'商业人脉', icon:'📜', desc:'订单栏位 +1',        max:2, base:220, mult:2.0 },
   { id:'thermo', name:'保温坩埚', icon:'🌡️', desc:'温度舒适区 +5',     max:3, base:180, mult:1.7 },
