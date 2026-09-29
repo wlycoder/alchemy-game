@@ -1,5 +1,5 @@
 /* ============================================================
-   数据定义（纯静态数据，无副作用）
+   数据定义
    ============================================================ */
 
 const ING = {
@@ -10,9 +10,9 @@ const ING = {
   ice:      { name:'冰晶',     icon:'❄️', rate:4600, max:4, price:25, temp:'cold' },
   thunder:  { name:'雷石',     icon:'⚡', rate:6200, max:3, price:32, temp:'hot' },
   moon:     { name:'月光草',   icon:'🌙', rate:6200, max:3, price:32, temp:'cold' },
-  sulfur:   { name:'硫磺',     icon:'./assets/texture/materials/sulfur.png', rate:7600, max:3, price:42, temp:'hot' },
+  sulfur:   { name:'硫磺',     icon:'./assests/texture/materials/sulfur.png', rate:7600, max:3, price:42, temp:'hot' },
   crystal:  { name:'水晶',     icon:'💎', rate:8000, max:3, price:46, temp:'neutral' },
-  phoenix:  { name:'凤凰羽',   icon:'./assets/texture/materials/feather.png', rate:9500, max:2, price:60, temp:'hot' },
+  phoenix:  { name:'凤凰羽',   icon:'./assests/texture/materials/feather.png', rate:9500, max:2, price:60, temp:'hot' },
 };
 
 const VARIANTS = {
@@ -25,41 +25,38 @@ const VARIANTS = {
   mysterious: { name:'神秘的', icon:'🔮', color:'#b16cff', mult:4.5 },
 };
 const VARIANT_ORDER = ['standard','gentle','burning','refreshing','mad','pure','mysterious'];
-
 const SAGE_ALLOWED_VARIANTS = ['standard', 'gentle', 'burning', 'mad'];
 
-const MID_SAGE = {
-  name: '中等贤者之石',
-  icon: '🟣',
-  price: 2000,
-  failChance: 0.3,
-};
-
-const PURE_SAGE = {
-  name: '纯净的初等贤者之石',
-  icon: '💠',
-  price: 5000,
-};
-
-const FINAL_SAGE = {
-  name: '最终贤者之石',
-  icon: '🌌',
-  price: 20000,
-};
+const MID_SAGE = { name: '中等贤者之石', icon: '🟣', price: 2000, failChance: 0.3 };
+const PURE_SAGE = { name: '纯净的初等贤者之石', icon: '💠', price: 5000 };
+const FINAL_SAGE = { name: '最终贤者之石', icon: '🌌', price: 20000 };
 
 const SAGE_CRAFT = {
   minMaterials: 2,
   finalSageMysteryChance: 0.8,
 };
 
-const MID_SAGE_SPEED = {
-  perStone: 0.15,
-  max: 0.6,
+const MID_SAGE_SPEED = { perStone: 0.15, max: 0.6 };
+
+/* ★ 初等贤者之石 · 三元素锁定小游戏 */
+const PRIMARY_GAME = {
+  zoneMin: 40,
+  zoneMax: 60,
+  speeds: [50, 65, 80],   // % / 秒
 };
 
-/* ============================================================
-   ★ 世界观
-   ============================================================ */
+/* ★ 中等贤者之石 · 精准滴定小游戏 */
+const MID_GAME = {
+  stages: [
+    { min: 40, max: 60, hold: 3.0 },
+    { min: 42, max: 58, hold: 3.0 },
+    { min: 45, max: 55, hold: 3.0 },
+  ],
+  fallRate: 25,     // 每秒自然下降
+  injectRate: 50,   // 每秒注入上升
+  startWater: 30,
+};
+
 const WORLD = {
   name: '艾瑟瑞亚',
   subtitle: '群山环抱的炼金之城',
@@ -70,9 +67,6 @@ const WORLD = {
   motto: '火与水，是万物之始；声誉如薄冰，行之慎之。',
 };
 
-/* ============================================================
-   ★ 环境新闻池
-   ============================================================ */
 const AMBIENT_NEWS = {
   good: [
     { title:'城中最热的话题', text:'城中最近有了一位口碑极佳的药剂师，贵族与商会皆争相拜访。', kind:'good' },
@@ -102,7 +96,7 @@ const RECIPES = [
   { id:'storm',    name:'雷暴药剂', icon:'🌩️', price:70,  mats:['thunder','fire'],             hint:'天雷引燃烈火' },
   { id:'moonlight',name:'月光药剂', icon:'🌙', price:65,  mats:['moon','water'],               hint:'月光沉入清泉' },
   { id:'static',   name:'静电药剂', icon:'🔋', price:60,  mats:['thunder','ice'],              hint:'雷霆冻结成霜' },
-  { id:'invis',    name:'隐身药水', icon:'./assets/texture/potion/invisibility.png', price:80, mats:['moon','ice'], hint:'寒冰中的月影' },
+  { id:'invis',    name:'隐身药水', icon:'./assests/texture/potion/invisibility.png', price:80, mats:['moon','ice'], hint:'寒冰中的月影' },
   { id:'poison',   name:'剧毒药剂', icon:'☠️', price:75,  mats:['mushroom','sulfur'],          hint:'菌类与硫磺的恶意', negative:true },
   { id:'wisdom',   name:'智慧药剂', icon:'📘', price:95,  mats:['crystal','moon'],             hint:'水晶映照月华，启迪心智' },
   { id:'vitality', name:'活力药剂', icon:'💗', price:110, mats:['phoenix','herb'],             hint:'凤凰羽与草药，生生不息' },
@@ -228,7 +222,6 @@ const CHAINS = [
     ]
   },
   {
-    /* ★ 发明家之梦：全局仅一次 */
     id:'inventor_dream', title:'发明家之梦', client:'alchemist', chainClass:'dream', once:true,
     steps:[
       { potion:'wisdom',   qty:1, variant:'any',
@@ -288,34 +281,20 @@ const REP_TIERS = [
   { at: 500, name:'贤者之名', icon:'🧙', kind:'good' },
 ];
 
-const VARIANT_THRESHOLDS = {
-  gentleAvgTemp: 48,
-  burningAvgTemp: 63,
-  madEscapes: 4,
-};
-
+const VARIANT_THRESHOLDS = { gentleAvgTemp: 48, burningAvgTemp: 63, madEscapes: 4 };
 const ZONE_DRIFT = {
-  firstDelayMin: 6000,
-  firstDelayMax: 10000,
-  intervalMin: 7000,
-  intervalMax: 13000,
-  shiftMin: 9,
-  shiftMax: 17,
+  firstDelayMin: 6000, firstDelayMax: 10000,
+  intervalMin: 7000, intervalMax: 13000,
+  shiftMin: 9, shiftMax: 17,
 };
-
 const MYSTERIOUS_CHANCE = 0.08;
 const PURE_STREAK = { required: 5, baseChance: 0.5, increment: 0.1, maxChance: 0.95 };
 const REFINE_CHANCE = 0.6;
 
-/* ★ 材料价格浮动：声誉与剧情影响 */
 const PRICE_MOD = {
   repTiers: [
-    { at: 500, mult: 0.70 },
-    { at: 300, mult: 0.80 },
-    { at: 150, mult: 0.90 },
-    { at: 60,  mult: 0.95 },
-    { at: -20, mult: 1.25 },
-    { at: -60, mult: 1.50 },
+    { at: 500, mult: 0.70 }, { at: 300, mult: 0.80 }, { at: 150, mult: 0.90 },
+    { at: 60,  mult: 0.95 }, { at: -20, mult: 1.25 }, { at: -60, mult: 1.50 },
   ],
   warHotIng: { sulfur: 1.8, thunder: 1.8 },
 };
@@ -327,72 +306,46 @@ const VARIANT_TIPS = [
   { v:'mad',        tip:'📖 变种手册：「疯狂的」——频繁逃出舒适区（≥4 次）就会癫狂。' },
   { v:'pure',       tip:'📖 变种手册：「纯净的」——连续炼出 5 瓶相同药剂后，下一瓶有 50% 概率成为纯净；失败则概率 +10%，成功则清零重来。' },
   { v:'mysterious', tip:'📖 变种手册：「神秘的」——每 100 次炼药约有 8 次会自行踏入这条小径。拥有中等贤者之石后，可在贤者炼制中直接指定。' },
-  { v:'midsage',    tip:'📖 贤者进阶：1 个初级贤者之石 + 1 瓶完美品质智慧药剂，可炼制中等贤者之石，30% 失败率。' },
+  { v:'midsage',    tip:'📖 贤者进阶：初级贤者之石 + 完美智慧药剂，通过精准滴定小游戏炼制中等贤者之石。' },
   { v:'sagecraft',  tip:'📖 贤者指定：持有中等贤者之石后，可指定任意药剂与变种，投入任意 2 种材料直接炼制（完美品质）。' },
   { v:'puresage',   tip:'📖 纯净贤者：集齐 4 种中等贤者之石后，消耗 1 瓶纯净的万灵药 + 4 瓶完美品质智慧药剂，可炼制纯净的初等贤者之石。' },
-  { v:'finalsage',  tip:'📖 贤者之极：4 种中等贤者之石 + 1 个纯净的初等贤者之石 + 1 瓶睿智药剂 + 1 瓶任意神秘的药剂。最终贤者之石可指定任意变种；选择神秘的时 80% 成功率。' },
+  { v:'finalsage',  tip:'📖 贤者之极：4 种中等贤者之石 + 纯净初等贤者之石 + 睿智药剂 + 神秘药剂。最终贤者之石让贤者炼制升级为「最终炼制」，全部 7 种变种可选，神秘的 100% 成功。' },
   { v:'midsagespeed', tip:'📖 贤者加速：每拥有 1 种中等贤者之石，炼制速度 +15%（最多 +60%），手动炼制与贤者指定炼制均生效。' },
   { v:'tier2variant', tip:'📖 二级加工：二阶药剂的变种会继承你最近一次贤者指定炼制所选的变种（"神秘的"除外）；未指定时则继承基础药剂的变种。' },
   { v:'orderchoice',  tip:'📖 订单变种：大多数订单不限变种。提交时可自行选择投入哪种变种，不同的变种会悄然改变剧情的走向。' },
   { v:'materialprice',tip:'📖 材料行情：材料价格随你的声誉涨落——声誉越高，进货越便宜；声誉越低，奸商越猖狂。' },
   { v:'storybranch',  tip:'📖 命运岔路：某些委托的变种选择会改写这座城市的命运，也会改变订单的流向。' },
+  { v:'primarygame',  tip:'📖 三元素共鸣：投入火之精华、硫磺、月光草后，依次点击三条轨道，将它们锁定在共鸣区。' },
+  { v:'midgame',      tip:'📖 精准滴定：按住按钮注入能量，让液位保持在绿色区间并持续 3 秒，共需通过三关。' },
 ];
 
 const ACHIEVEMENTS = [
-  { id:'first_potion',   name:'初出茅庐', icon:'🌱', desc:'炼出第一瓶药剂',
-    check: s => s.stats.potionsBrewed >= 1 },
-  { id:'first_perfect',  name:'完美主义', icon:'💎', desc:'炼出一瓶完美品质药剂',
-    check: s => s.stats.perfectBrewed >= 1 },
-  { id:'variant_scholar',name:'变种学者', icon:'📘', desc:'收集到 5 种不同变种',
-    check: s => s.stats.variantsSeen.size >= 5 },
-  { id:'variant_master', name:'变种大师', icon:'🎓', desc:'收集到全部 7 种变种',
-    check: s => s.stats.variantsSeen.size >= 7 },
-  { id:'sage_path',      name:'贤者之路', icon:'🔴', desc:'炼成初级贤者之石',
-    check: s => s.sageVariants.size >= 1 },
-  { id:'sage_triad',     name:'贤者三重', icon:'🧙', desc:'拥有 3 种初级贤者之石变种',
-    check: s => s.sageVariants.size >= 3 },
-  { id:'mid_sage',       name:'贤者进阶', icon:'🟣', desc:'炼制出中等贤者之石',
-    check: s => s.midSageVariants.size >= 1 },
-  { id:'mid_sage_all',   name:'贤者大成', icon:'🌌', desc:'集齐 4 种变种的中等贤者之石',
-    check: s => s.midSageVariants.size >= 4 },
-  { id:'pure_sage',      name:'纯净贤者', icon:'💠', desc:'炼制出纯净的初等贤者之石',
-    check: s => s.pureSageOwned },
-  { id:'final_sage',     name:'终极贤者', icon:'🌌', desc:'炼制出最终贤者之石',
-    check: s => s.finalSageOwned },
-  { id:'sage_crafter',   name:'贤者之手', icon:'🖐️', desc:'使用中等贤者之石指定炼制 10 次',
-    check: s => s.stats.sageCraftCount >= 10 },
-  { id:'merchant_friend',name:'商人的朋友', icon:'🤝', desc:'与云游商人完成 10 次交易',
-    check: s => s.stats.merchantDeals >= 10 },
-  { id:'rich',           name:'炼金首富', icon:'💎', desc:'金币达到 5000',
-    check: s => s.gold >= 5000 },
-  { id:'famous',         name:'名满天下', icon:'🌟', desc:'声望达到 300',
-    check: s => s.rep >= 300 },
-  { id:'all_recipes',    name:'炼金全典', icon:'📖', desc:'解锁全部基础配方',
-    check: s => RECIPES.every(r => s.discovered.has(r.id)) },
-  { id:'first_t2',       name:'二次加工', icon:'⚗️', desc:'首次制作二级药剂',
-    check: s => s.stats.tier2Crafted >= 1 },
-  { id:'chain_master',   name:'一诺千金', icon:'📜', desc:'完成任意一条订单链',
-    check: s => s.stats.chainsCompleted >= 1 },
-  { id:'mad_scientist',  name:'疯狂科学家', icon:'🌀', desc:'炼出疯狂的变种',
-    check: s => s.stats.variantsSeen.has('mad') },
-  { id:'big_buyer',      name:'大手笔', icon:'🛒', desc:'购买 50 次材料',
-    check: s => s.stats.purchases >= 50 },
-  { id:'plague_hero',    name:'瘟疫救星', icon:'⚕️', desc:'完成【瘟疫蔓延】委托链',
-    check: s => s.stats.chainsDone.has('plague') },
-  { id:'war_hero',       name:'战争英雄', icon:'🛡️', desc:'完成【战争的阴云】委托链',
-    check: s => s.stats.chainsDone.has('war') },
-  { id:'mystery_seeker', name:'神秘学者', icon:'🔮', desc:'炼出「神秘的」变种',
-    check: s => s.stats.variantsSeen.has('mysterious') },
-  { id:'pure_master',    name:'纯净之心', icon:'✨', desc:'炼出「纯净的」变种',
-    check: s => s.stats.variantsSeen.has('pure') },
-  { id:'refiner',        name:'重炼师',   icon:'💧', desc:'重炼出「提神的」变种',
-    check: s => s.stats.variantsSeen.has('refreshing') && s.stats.refineCount >= 1 },
-  { id:'good_doctor',    name:'仁心仁术', icon:'⚕️', desc:'以温和之药救治农夫的妻子',
-    check: s => s.stats.goodDoctorFlag === true },
-  { id:'dream_maker',    name:'梦想共筑', icon:'💡', desc:'完成【发明家之梦】委托链',
-    check: s => s.stats.chainsDone.has('inventor_dream') },
-  { id:'maker_sage',     name:'制造贤者', icon:'🏰', desc:'见证「万用颗粒」的诞生',
-    check: s => s.storyFlags && s.storyFlags.inventorGenius === true },
-  { id:'war_maker',      name:'战火引线', icon:'🔥', desc:'见证「真正的战争」',
-    check: s => s.storyFlags && s.storyFlags.inventorWar === true },
+  { id:'first_potion',   name:'初出茅庐', icon:'🌱', desc:'炼出第一瓶药剂', check: s => s.stats.potionsBrewed >= 1 },
+  { id:'first_perfect',  name:'完美主义', icon:'💎', desc:'炼出一瓶完美品质药剂', check: s => s.stats.perfectBrewed >= 1 },
+  { id:'variant_scholar',name:'变种学者', icon:'📘', desc:'收集到 5 种不同变种', check: s => s.stats.variantsSeen.size >= 5 },
+  { id:'variant_master', name:'变种大师', icon:'🎓', desc:'收集到全部 7 种变种', check: s => s.stats.variantsSeen.size >= 7 },
+  { id:'sage_path',      name:'贤者之路', icon:'🔴', desc:'炼成初级贤者之石', check: s => s.sageVariants.size >= 1 },
+  { id:'sage_triad',     name:'贤者三重', icon:'🧙', desc:'拥有 3 种初级贤者之石变种', check: s => s.sageVariants.size >= 3 },
+  { id:'mid_sage',       name:'贤者进阶', icon:'🟣', desc:'炼制出中等贤者之石', check: s => s.midSageVariants.size >= 1 },
+  { id:'mid_sage_all',   name:'贤者大成', icon:'🌌', desc:'集齐 4 种变种的中等贤者之石', check: s => s.midSageVariants.size >= 4 },
+  { id:'pure_sage',      name:'纯净贤者', icon:'💠', desc:'炼制出纯净的初等贤者之石', check: s => s.pureSageOwned },
+  { id:'final_sage',     name:'终极贤者', icon:'🌌', desc:'炼制出最终贤者之石', check: s => s.finalSageOwned },
+  { id:'sage_crafter',   name:'贤者之手', icon:'🖐️', desc:'使用贤者指定炼制 10 次', check: s => s.stats.sageCraftCount >= 10 },
+  { id:'merchant_friend',name:'商人的朋友', icon:'🤝', desc:'与云游商人完成 10 次交易', check: s => s.stats.merchantDeals >= 10 },
+  { id:'rich',           name:'炼金首富', icon:'💎', desc:'金币达到 5000', check: s => s.gold >= 5000 },
+  { id:'famous',         name:'名满天下', icon:'🌟', desc:'声望达到 300', check: s => s.rep >= 300 },
+  { id:'all_recipes',    name:'炼金全典', icon:'📖', desc:'解锁全部基础配方', check: s => RECIPES.every(r => s.discovered.has(r.id)) },
+  { id:'first_t2',       name:'二次加工', icon:'⚗️', desc:'首次制作二级药剂', check: s => s.stats.tier2Crafted >= 1 },
+  { id:'chain_master',   name:'一诺千金', icon:'📜', desc:'完成任意一条订单链', check: s => s.stats.chainsCompleted >= 1 },
+  { id:'mad_scientist',  name:'疯狂科学家', icon:'🌀', desc:'炼出疯狂的变种', check: s => s.stats.variantsSeen.has('mad') },
+  { id:'big_buyer',      name:'大手笔', icon:'🛒', desc:'购买 50 次材料', check: s => s.stats.purchases >= 50 },
+  { id:'plague_hero',    name:'瘟疫救星', icon:'⚕️', desc:'完成【瘟疫蔓延】委托链', check: s => s.stats.chainsDone.has('plague') },
+  { id:'war_hero',       name:'战争英雄', icon:'🛡️', desc:'完成【战争的阴云】委托链', check: s => s.stats.chainsDone.has('war') },
+  { id:'mystery_seeker', name:'神秘学者', icon:'🔮', desc:'炼出「神秘的」变种', check: s => s.stats.variantsSeen.has('mysterious') },
+  { id:'pure_master',    name:'纯净之心', icon:'✨', desc:'炼出「纯净的」变种', check: s => s.stats.variantsSeen.has('pure') },
+  { id:'refiner',        name:'重炼师',   icon:'💧', desc:'重炼出「提神的」变种', check: s => s.stats.variantsSeen.has('refreshing') && s.stats.refineCount >= 1 },
+  { id:'good_doctor',    name:'仁心仁术', icon:'⚕️', desc:'以温和之药救治农夫的妻子', check: s => s.stats.goodDoctorFlag === true },
+  { id:'dream_maker',    name:'梦想共筑', icon:'💡', desc:'完成【发明家之梦】委托链', check: s => s.stats.chainsDone.has('inventor_dream') },
+  { id:'maker_sage',     name:'制造贤者', icon:'🏰', desc:'见证「万用颗粒」的诞生', check: s => s.storyFlags && s.storyFlags.inventorGenius === true },
+  { id:'war_maker',      name:'战火引线', icon:'🔥', desc:'见证「真正的战争」', check: s => s.storyFlags && s.storyFlags.inventorWar === true },
 ];

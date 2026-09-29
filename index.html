@@ -22,7 +22,6 @@
       <div class="stat sage">🧙 <b id="merchantEta">--</b></div>
     </div>
     <div class="header-actions">
-      <button class="mini-btn" id="finalCraftBtn" title="最终炼制" style="display:none">🌟</button>
       <button class="mini-btn" id="updateBtn" title="更新说明">📢</button>
       <button class="mini-btn" id="saveBtn" title="保存进度">💾</button>
       <button class="mini-btn" id="resetBtn" title="重置游戏">🔄</button>
@@ -74,8 +73,8 @@
       </div>
 
       <div class="sage-craft" id="sageCraftPanel">
-        <div class="sc-title">🟣 贤 者 指 定 炼 制</div>
-        <div class="sc-sub">选择目标药剂与变种，投入任意 2 种以上材料即可炼制</div>
+        <div class="sc-title" id="scTitle">🟣 贤 者 指 定 炼 制</div>
+        <div class="sc-sub" id="scSub">选择目标药剂与变种，投入任意 2 种以上材料即可炼制</div>
         <div class="sc-variants" id="scVariants"></div>
         <div class="sc-potions" id="scPotions"></div>
         <button class="sc-craft-btn" id="scCraftBtn" disabled>贤 者 炼 制</button>
@@ -111,7 +110,6 @@
     <div class="shelf" id="shelf"></div>
   </section>
 
-  <!-- ★ 新闻栏 -->
   <section class="panel news-panel">
     <h2>📰 城 中 见 闻　<small>市井闲谈 · 每日更新</small></h2>
     <div class="news-list" id="newsList"></div>
@@ -142,7 +140,6 @@
   </div>
 </div>
 
-<!-- 更新说明浮窗 -->
 <div class="update-modal" id="updateModal">
   <div class="update-card">
     <div class="update-head">
@@ -154,39 +151,6 @@
   </div>
 </div>
 
-<!-- 最终炼制浮窗 -->
-<div class="final-craft-modal" id="finalCraftModal">
-  <div class="final-craft-card">
-    <div class="fc-head">
-      <span class="fc-icon">🌟</span>
-      <span class="fc-title">最 终 炼 制</span>
-      <button class="fc-close" id="finalCraftClose" title="关闭">✕</button>
-    </div>
-    <div class="fc-body">
-      <div class="fc-intro">
-        以最终贤者之石为核，将坩埚中的材料瞬间凝练为完美药剂——<br>
-        <b style="color:#ffdca0">必定成功，必定完美品质</b>。
-      </div>
-      <div class="fc-section">
-        <div class="fc-label">① 选 择 变 种</div>
-        <div class="fc-variants" id="fcVariants"></div>
-      </div>
-      <div class="fc-section">
-        <div class="fc-label">② 选 择 药 剂</div>
-        <div class="fc-potions" id="fcPotions"></div>
-      </div>
-      <div class="fc-section">
-        <div class="fc-label">③ 坩 埚 材 料</div>
-        <div class="fc-materials" id="fcMaterials"></div>
-      </div>
-      <div class="fc-status" id="fcStatus">请选择药剂</div>
-      <button class="fc-start-btn" id="finalCraftStartBtn" disabled>开 始 最 终 炼 制</button>
-      <div class="fc-progress" id="fcProgress"><i></i></div>
-    </div>
-  </div>
-</div>
-
-<!-- 交付浮窗 -->
 <div class="deliver-modal" id="deliverModal">
   <div class="deliver-card">
     <div class="deliver-head">
@@ -202,6 +166,9 @@
     </div>
   </div>
 </div>
+
+<!-- ★ 贤者之石炼制小游戏容器 -->
+<div class="sage-game-modal" id="sageGameModal"></div>
 
 <script src="js/data.js"></script>
 <script src="js/game.js"></script>

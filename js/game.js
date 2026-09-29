@@ -1,7 +1,7 @@
 /* ============================================================
    状态
    ============================================================ */
-const SAVE_KEY = 'alchemy_save_v9';
+const SAVE_KEY = 'alchemy_save_v10';
 
 const state = {
   gold: 40, rep: 0,
@@ -30,27 +30,13 @@ const state = {
   pureChance: 0.5,
   news: [],
   nextAmbientNewsIn: 30000,
-  /* ★ 剧情状态 */
-  storyFlags: {
-    inventorGenius: false,   // 制造贤者路线
-    inventorWar: false,      // 战争路线
-  },
+  storyFlags: { inventorGenius: false, inventorWar: false },
   stats: {
-    potionsBrewed: 0,
-    perfectBrewed: 0,
-    tier2Crafted: 0,
-    chainsCompleted: 0,
-    merchantDeals: 0,
-    purchases: 0,
-    ordersRejected: 0,
-    refineCount: 0,
-    midSageCrafted: 0,
-    sageCraftCount: 0,
-    variantsSeen: new Set(),
-    chainsDone: new Set(),
-    chainsActivated: new Set(),
-    goodDoctorFlag: false,
-    badDoctorFlag: false,
+    potionsBrewed: 0, perfectBrewed: 0, tier2Crafted: 0, chainsCompleted: 0,
+    merchantDeals: 0, purchases: 0, ordersRejected: 0, refineCount: 0,
+    midSageCrafted: 0, sageCraftCount: 0,
+    variantsSeen: new Set(), chainsDone: new Set(), chainsActivated: new Set(),
+    goodDoctorFlag: false, badDoctorFlag: false,
   },
 };
 
@@ -67,16 +53,14 @@ const brew = {
   rafId:null, lastTs:0,
   pendingRecipe:null, isSage:false,
   mysteriousRoll: false,
-  isRefine: false,
-  refineSuccess: false,
-  isSageCraft: false,
-  sageCraftTarget: null,
+  isRefine: false, refineSuccess: false,
+  isSageCraft: false, sageCraftTarget: null,
 };
 
 let isResetting = false;
 
 /* ============================================================
-   DOM 引用
+   DOM
    ============================================================ */
 const $ = id => document.getElementById(id);
 const ingGrid=$('ingGrid'), logEl=$('log'), liquidEl=$('liquid'), bubbleLayer=$('bubbleLayer');
@@ -89,9 +73,10 @@ const brewUI=$('brewUI'), heatZone=$('heatZone'), heatFill=$('heatFill'),
       brewProgress=$('brewProgress'), brewQuality=$('brewQuality'), brewHint=$('brewHint');
 const sageSelector=$('sageSelector'), sageRow=$('sageRow');
 const sageCraftPanel=$('sageCraftPanel'), scVariants=$('scVariants'),
-      scPotions=$('scPotions'), scCraftBtn=$('scCraftBtn'), scStatus=$('scStatus');
-const shelfEl=$('shelf');
-const newsListEl=$('newsList');
+      scPotions=$('scPotions'), scCraftBtn=$('scCraftBtn'), scStatus=$('scStatus'),
+      scTitle=$('scTitle'), scSub=$('scSub');
+const shelfEl=$('shelf'), newsListEl=$('newsList');
+const sageGameModal=$('sageGameModal');
 const panes={
   orders:$('pane-orders'), tier2:$('pane-tier2'),
   upgrades:$('pane-upgrades'), achievements:$('pane-achievements'),
@@ -142,27 +127,21 @@ const midSageSpeedMult = () => {
   return 1 + Math.min(MID_SAGE_SPEED.max, n * MID_SAGE_SPEED.perStone);
 };
 
-/* ★ 材料价格：受声誉 + 剧情影响 */
 function ingPrice(id) {
   const d = ING[id];
   if (!d) return 0;
   let mult = 1.0;
   const rep = state.rep;
-
-  /* 声誉影响 */
   if (rep >= 500) mult *= 0.70;
   else if (rep >= 300) mult *= 0.80;
   else if (rep >= 150) mult *= 0.90;
   else if (rep >= 60)  mult *= 0.95;
   else if (rep <= -60) mult *= 1.50;
   else if (rep <= -20) mult *= 1.25;
-
-  /* 战争剧情影响：硫磺与雷石涨价 */
   if (state.storyFlags && state.storyFlags.inventorWar) {
     if (id === 'sulfur') mult *= PRICE_MOD.warHotIng.sulfur;
     if (id === 'thunder') mult *= PRICE_MOD.warHotIng.thunder;
   }
-
   return Math.max(1, Math.round(d.price * mult));
 }
 
@@ -171,9 +150,7 @@ const getTier2  = id => TIER2.find(t => t.id === id);
 function potionDef(id) {
   return RECIPES.find(r => r.id === id) || TIER2.find(t => t.id === id) || SAGE;
 }
-function isPrimaryRecipe(id) {
-  return RECIPES.some(r => r.id === id);
-}
+function isPrimaryRecipe(id) { return RECIPES.some(r => r.id === id); }
 const potKey = (id, v) => id + '|' + v;
 function potSlot(id, v) {
   const k = potKey(id, v);
@@ -182,8 +159,13 @@ function potSlot(id, v) {
 }
 function potTotal(id, v) { const a = potSlot(id, v); return a[0]+a[1]+a[2]; }
 function allBaseUnlocked() { return RECIPES.every(r => state.discovered.has(r.id)); }
+
+/* ★ 解锁条件：只要拥有初级 / 中等 / 纯净 / 最终任一即可 */
 function hasSage() {
-  return state.sageVariants.size > 0 || state.midSageVariants.size > 0 || state.pureSageOwned;
+  return state.sageVariants.size > 0
+    || state.midSageVariants.size > 0
+    || state.pureSageOwned
+    || state.finalSageOwned;
 }
 function hasPrimarySage() { return state.sageVariants.size > 0; }
 function hasMidSage() { return state.midSageVariants.size > 0; }
@@ -197,20 +179,18 @@ function pickSageVariantFor() {
 }
 
 /* ============================================================
-   新闻系统
+   新闻
    ============================================================ */
 function addNews(title, text, kind = 'info') {
   const item = {
     id: 'news_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-    title, text, kind,
-    time: Date.now(),
+    title, text, kind, time: Date.now(),
   };
   state.news.unshift(item);
   if (state.news.length > 30) state.news.pop();
   safe(renderNews, 'renderNews');
   safe(() => saveGame(true), 'saveGame');
 }
-
 function renderNews() {
   if (!newsListEl) return;
   if (!state.news || state.news.length === 0) {
@@ -227,36 +207,29 @@ function renderNews() {
     newsListEl.appendChild(div);
   }
 }
-
 function spawnAmbientNews() {
   const rep = state.rep;
   let pool;
   if (rep >= 60) pool = AMBIENT_NEWS.good;
   else if (rep <= -20) pool = AMBIENT_NEWS.bad;
   else pool = AMBIENT_NEWS.neutral;
-
   const item = pool[Math.floor(Math.random() * pool.length)];
   addNews(item.title, item.text, item.kind);
 }
 
 /* ============================================================
-   贤者炼制可选变种
+   贤者炼制变种
    ============================================================ */
 function getSageCraftVariants(targetPotionId) {
-  if (targetPotionId === SAGE.id) {
-    return [...SAGE_ALLOWED_VARIANTS];
-  }
+  if (targetPotionId === SAGE.id) return [...SAGE_ALLOWED_VARIANTS];
 
   const list = [];
   for (const v of SAGE_ALLOWED_VARIANTS) {
     if (state.midSageVariants.has(v)) list.push(v);
   }
-  if (state.pureSageOwned && !list.includes('pure')) {
-    list.push('pure');
-  }
-  if (state.midSageVariants.size > 0 && !list.includes('mysterious')) {
-    list.push('mysterious');
-  }
+  if (state.pureSageOwned && !list.includes('pure')) list.push('pure');
+  if (state.midSageVariants.size > 0 && !list.includes('mysterious')) list.push('mysterious');
+  /* ★ 最终贤者之石：全部变种 */
   if (state.finalSageOwned) {
     for (const v of VARIANT_ORDER) {
       if (!list.includes(v)) list.push(v);
@@ -264,21 +237,14 @@ function getSageCraftVariants(targetPotionId) {
   }
   return list;
 }
-
 function getSageCraftPotions() {
   const list = [];
   for (const r of RECIPES) if (state.discovered.has(r.id)) list.push(r);
   for (const t of TIER2) if (state.discovered.has(t.id)) list.push(t);
-  if (state.discovered.has(SAGE.id)) {
-    list.push(SAGE);
-  }
+  if (state.discovered.has(SAGE.id)) list.push(SAGE);
   return list;
 }
-
-function isSagePotionTarget(potionId) {
-  return potionId === SAGE.id;
-}
-
+function isSagePotionTarget(potionId) { return potionId === SAGE.id; }
 function normalizeSageCraftVariant() {
   if (!state.sageCraft.potionId) return;
   if (isSagePotionTarget(state.sageCraft.potionId)) {
@@ -286,6 +252,10 @@ function normalizeSageCraftVariant() {
       state.sageCraft.variant = 'standard';
     }
   }
+}
+/* ★ 最终贤者之石解锁后，神秘变种 100% 成功 */
+function getMysteriousChance() {
+  return state.finalSageOwned ? 1.0 : SAGE_CRAFT.finalSageMysteryChance;
 }
 
 function perfectWisdomCount() {
@@ -320,7 +290,6 @@ function findMysteriousPotionSlot() {
   }
   return null;
 }
-
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 
 function log(msg, type='') {
@@ -331,14 +300,12 @@ function log(msg, type='') {
   while (logEl.children.length > 45) logEl.lastChild.remove();
 }
 function pulseEl(el){el.classList.remove('pulse');void el.offsetWidth;el.classList.add('pulse');}
-
 function showEventBanner(text, kind='good') {
   eventBanner.textContent = text;
   eventBanner.className = 'event-banner show ' + kind;
   clearTimeout(showEventBanner._t);
   showEventBanner._t = setTimeout(() => { eventBanner.classList.remove('show'); }, 4800);
 }
-
 function showAchievementPopup(a) {
   achievementPopup.innerHTML = `
     <span class="ap-icon">${a.icon}</span>
@@ -351,10 +318,8 @@ function showAchievementPopup(a) {
   clearTimeout(showAchievementPopup._t);
   showAchievementPopup._t = setTimeout(() => { achievementPopup.classList.remove('show'); }, 4000);
 }
-
 function safe(fn, label) {
-  try { fn(); }
-  catch (e) { console.error(`[${label}]`, e); }
+  try { fn(); } catch (e) { console.error(`[${label}]`, e); }
 }
 
 /* ============================================================
@@ -385,7 +350,7 @@ function saveGame(silent) {
   if (isResetting) return false;
   try {
     const save = {
-      version: 9,
+      version: 10,
       gold: state.gold, rep: state.rep,
       stock: state.stock, acc: state.acc,
       cauldron: state.cauldron, cauldronPotion: state.cauldronPotion,
@@ -434,13 +399,12 @@ function saveGame(silent) {
     return false;
   }
 }
-
 function loadGame() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return false;
     const s = JSON.parse(raw);
-    if (!s || s.version !== 9) return false;
+    if (!s || s.version !== 10) return false;
 
     state.gold = s.gold ?? 40;
     state.rep = s.rep ?? 0;
@@ -489,12 +453,8 @@ function loadGame() {
     state.stats.goodDoctorFlag = st.goodDoctorFlag || false;
     state.stats.badDoctorFlag = st.badDoctorFlag || false;
     return true;
-  } catch (e) {
-    console.warn('读档失败', e);
-    return false;
-  }
+  } catch (e) { console.warn('读档失败', e); return false; }
 }
-
 function resetGame() {
   if (!confirm('确定要重置游戏吗？所有进度将被清除。')) return;
   isResetting = true;
@@ -525,13 +485,9 @@ function checkAchievements() {
     safe(() => saveGame(true), 'saveGame');
   }
 }
-
 function showVariantTip() {
   const remaining = VARIANT_TIPS.filter(t => !state.variantTipsShown.has(t.v));
-  if (remaining.length === 0) {
-    state.variantTipsShown.clear();
-    remaining.push(...VARIANT_TIPS);
-  }
+  if (remaining.length === 0) { state.variantTipsShown.clear(); remaining.push(...VARIANT_TIPS); }
   const tip = remaining[Math.floor(Math.random() * remaining.length)];
   state.variantTipsShown.add(tip.v);
   log(tip.tip, 'sage');
@@ -549,22 +505,7 @@ function renderHeader(flashGold) {
   if (state.rep < 0) repStatEl.classList.add('neg');
   else repStatEl.classList.remove('neg');
   if (flashGold) pulseEl(goldEl);
-
-  /* ★ 最终炼制按钮：仅在解锁最终贤者之石后显示 */
-  const fcBtn = $('finalCraftBtn');
-  if (fcBtn) {
-    if (state.finalSageOwned) {
-      fcBtn.style.display = '';
-    } else {
-      fcBtn.style.display = 'none';
-      /* 未解锁时强制关闭浮窗 */
-      if (finalCraftModal && finalCraftModal.classList.contains('show')) {
-        finalCraftModal.classList.remove('show');
-      }
-    }
-  }
 }
-
 function renderMerchantEta() {
   if (state.merchant.active) {
     merchantEtaEl.textContent = state.merchant.type ? state.merchant.type.name : '到访中';
@@ -577,25 +518,21 @@ function renderMerchantEta() {
     merchantEtaEl.style.color = '';
   }
 }
-
 function renderIngredients() {
   for (const id in ING) {
     const n = state.stock[id], el = ingEls[id];
     if (!el) continue;
     el.count.textContent = n;
-
-    /* ★ 显示当前价格 */
     const price = ingPrice(id);
     el.buy.textContent = '💰' + price;
     el.buy.title = `购买一份 ${ING[id].name}（${price}💰）`;
-
     const hasRefine = !!state.cauldronPotion;
-    el.btn.disabled = (n <= 0) || brew.active || hasRefine;
+    const gameActive = primaryGame.active || midGame.active;
+    el.btn.disabled = (n <= 0) || brew.active || hasRefine || gameActive;
     el.bar.style.width = (n >= ING[id].max) ? '0%' : Math.min(100, state.acc[id] * 100) + '%';
-    el.buy.classList.toggle('off', n >= ING[id].max || brew.active || hasRefine);
+    el.buy.classList.toggle('off', n >= ING[id].max || brew.active || hasRefine || gameActive);
   }
 }
-
 function renderCauldron() {
   if (state.cauldronPotion) {
     const p = state.cauldronPotion;
@@ -647,16 +584,15 @@ function renderCauldron() {
     }
     liquidEl.style.height = (22 + state.cauldron.length * 13) + '%';
   }
-
+  const gameActive = primaryGame.active || midGame.active;
   if (state.cauldronPotion) {
-    brewBtn.disabled = brew.active;
-    clearBtn.disabled = brew.active;
+    brewBtn.disabled = brew.active || gameActive;
+    clearBtn.disabled = brew.active || gameActive;
   } else {
-    brewBtn.disabled = brew.active || state.cauldron.length < 2;
-    clearBtn.disabled = brew.active || state.cauldron.length === 0;
+    brewBtn.disabled = brew.active || state.cauldron.length < 2 || gameActive;
+    clearBtn.disabled = brew.active || state.cauldron.length === 0 || gameActive;
   }
 }
-
 function renderOrders() {
   const pane = panes.orders;
   if (state.discovered.size === 0) {
@@ -706,7 +642,6 @@ function renderOrders() {
       ? `<div class="order-chain-title ${chainClass}">${chainInfo.title} · 第 ${(chainSt.step||0) + 1}/${chainInfo.steps.length} 环</div>`
       : '';
 
-    /* ★ 材料奖励显示 */
     let matsTxt = '';
     if (o.matsReward && ING[o.matsReward.id]) {
       matsTxt = `<div class="order-mats-reward">🎁 ${ING[o.matsReward.id].name} ×${o.matsReward.qty}</div>`;
@@ -737,7 +672,6 @@ function renderOrders() {
     pane.appendChild(div);
   }
 }
-
 function rejectOrder(uid) {
   const idx = state.orders.findIndex(o => o.uid === uid);
   if (idx < 0) return;
@@ -757,7 +691,6 @@ function rejectOrder(uid) {
   safe(renderOrders, 'renderOrders');
   safe(() => saveGame(true), 'saveGame');
 }
-
 function renderUpgrades() {
   const pane = panes.upgrades;
   pane.innerHTML = '';
@@ -782,7 +715,6 @@ function renderUpgrades() {
     pane.appendChild(div);
   }
 }
-
 function renderAchievements() {
   const pane = panes.achievements;
   pane.innerHTML = '';
@@ -800,7 +732,6 @@ function renderAchievements() {
     pane.appendChild(div);
   }
 }
-
 function renderCodex() {
   const pane = panes.codex;
   pane.innerHTML = '';
@@ -835,8 +766,8 @@ function renderCodex() {
       burning: '全程均温保持在 63° 以上。',
       refreshing: '将已炼成的药水重新投入坩埚重炼，60% 概率转化为提神的；失败则原样退回。',
       mad: '频繁逃出舒适区（≥4 次）就会癫狂。',
-      pure: '连续炼出 5 瓶相同药剂后，下一瓶有 50% 概率成为纯净；每次失败概率 +10%，成功则清零重来。贤者指定炼制同样可以触发纯净连击。',
-      mysterious: '每 100 次炼药约有 8 次会自行踏入这条小径。拥有中等贤者之石后，可在贤者炼制中直接指定，成功率为 80%；失败则得到随机药剂的随机变种。',
+      pure: '连续炼出 5 瓶相同药剂后，下一瓶有 50% 概率成为纯净；每次失败概率 +10%，成功则清零重来。',
+      mysterious: '每 100 次炼药约有 8 次会自行踏入这条小径。拥有中等贤者之石后，可在贤者炼制中直接指定；拥有最终贤者之石后必定成功。',
     };
     div.innerHTML = `
       <div class="codex-head">
@@ -853,6 +784,20 @@ function renderCodex() {
   s2.textContent = '贤 者 之 路';
   pane.appendChild(s2);
 
+  const primaryInfo = document.createElement('div');
+  primaryInfo.className = 'codex-item ' + (state.sageVariants.size > 0 ? 'known' : 'unknown');
+  primaryInfo.innerHTML = `
+    <div class="codex-head">
+      <span class="ci-icon">🔴</span>
+      <span class="ci-name">初级贤者之石</span>
+    </div>
+    <div class="codex-body">${
+      state.sageVariants.size > 0
+        ? `已拥有 ${state.sageVariants.size} 种变种。投入火之精华、硫磺、月光草，通过「三元素锁定」小游戏炼制。`
+        : '投入火之精华、硫磺、月光草，通过「三元素锁定」小游戏炼制。'
+    }</div>`;
+  pane.appendChild(primaryInfo);
+
   const midInfo = document.createElement('div');
   midInfo.className = 'codex-item ' + (state.midSageVariants.size > 0 ? 'known' : 'unknown');
   midInfo.innerHTML = `
@@ -862,8 +807,8 @@ function renderCodex() {
     </div>
     <div class="codex-body">${
       state.midSageVariants.size > 0
-        ? `已拥有 ${state.midSageVariants.size} / 4 种变种。可在坩埚「贤者指定」中指定药剂与变种炼制。`
-        : '以 1 个初级贤者之石 + 1 瓶完美品质智慧药剂炼制，30% 失败率。'
+        ? `已拥有 ${state.midSageVariants.size} / 4 种变种。消耗初级贤者之石 + 完美智慧药剂，通过「精准滴定」小游戏炼制。`
+        : '消耗初级贤者之石 + 完美品质智慧药剂，通过「精准滴定」小游戏炼制。'
     }</div>`;
   pane.appendChild(midInfo);
 
@@ -877,7 +822,7 @@ function renderCodex() {
     </div>
     <div class="codex-body">${
       state.midSageVariants.size > 0
-        ? `当前拥有 ${state.midSageVariants.size} 种中等贤者之石，炼制速度 +${speedPct}%（手动炼制与贤者指定均生效）。`
+        ? `当前拥有 ${state.midSageVariants.size} 种中等贤者之石，炼制速度 +${speedPct}%。`
         : '每拥有 1 种中等贤者之石，炼制速度 +15%，最多 +60%。'
     }</div>`;
   pane.appendChild(spdInfo);
@@ -906,7 +851,7 @@ function renderCodex() {
     </div>
     <div class="codex-body">${
       state.finalSageOwned
-        ? '🏆 已解锁「最终炼制」浮窗：可指定任意变种，必定成功且必定完美品质。'
+        ? '🏆 贤者炼制已升级为「最终炼制」：全部 7 种变种可选，神秘的 100% 成功。'
         : state.pureSageOwned
           ? '以 4 种中等贤者之石 + 纯净初等贤者之石 + 睿智药剂 + 任意神秘药剂炼制。'
           : '需要先炼制纯净的初等贤者之石。'
@@ -942,7 +887,6 @@ function renderCodex() {
     pane.appendChild(div);
   }
 }
-
 function renderTier2() {
   const pane = panes.tier2;
   if (!hasSage()) {
@@ -965,7 +909,7 @@ function renderTier2() {
       <div class="upg-name">中等贤者之石 · 炼制加速</div>
       <div class="upg-desc">${
         state.midSageVariants.size > 0
-          ? `当前拥有 ${state.midSageVariants.size} 种，炼制速度 <b style="color:#e0c0ff">+${speedPct}%</b>（手动炼制与贤者指定均生效）。`
+          ? `当前拥有 ${state.midSageVariants.size} 种，炼制速度 <b style="color:#e0c0ff">+${speedPct}%</b>。`
           : '每拥有 1 种中等贤者之石，炼制速度 +15%，最多 +60%。'
       }</div>
     </div>`;
@@ -983,14 +927,14 @@ function renderTier2() {
       <span class="upg-icon">🧬</span>
       <div class="upg-body">
         <div class="upg-name">二级变种继承</div>
-        <div class="upg-desc">当前贤者指定变种：<b style="color:${vd.color}">${vTxt}</b>，二阶药剂将继承此变种（"神秘的"除外）。</div>
+        <div class="upg-desc">当前贤者指定变种：<b style="color:${vd.color}">${vTxt}</b>，二阶药剂将继承此变种。</div>
       </div>`;
   } else {
     inheritInfo.innerHTML = `
       <span class="upg-icon">🧬</span>
       <div class="upg-body">
         <div class="upg-name">二级变种继承</div>
-        <div class="upg-desc"><span style="color:#6f6a8a">在下方「贤者指定」中选择变种，二阶药剂将继承它；未指定时继承基础药剂的变种。</span></div>
+        <div class="upg-desc"><span style="color:#6f6a8a">在下方「贤者指定」中选择变种，二阶药剂将继承它。</span></div>
       </div>`;
   }
   pane.appendChild(inheritInfo);
@@ -1015,7 +959,7 @@ function renderTier2() {
           midOwned ? '<b style="color:#f5d76a">✅ 已拥有</b>' :
           !owned ? '<span style="color:#6f6a8a">缺少初级贤者之石</span>' :
           wisdomQty <= 0 ? '<span style="color:#6f6a8a">缺少完美品质智慧药剂</span>' :
-          '<b style="color:#e0c0ff">可炼制 · 30% 失败率</b>'
+          '<b style="color:#e0c0ff">可炼制 · 精准滴定</b>'
         }</div>
       </div>
       <button class="upg-buy mid" ${canCraft ? '' : 'disabled'}>${midOwned ? '已拥有' : '炼制'}</button>`;
@@ -1069,7 +1013,7 @@ function renderTier2() {
       <div class="upg-name">最终贤者之石<span>${FINAL_SAGE.price}💰</span></div>
       <div class="upg-desc"><span>4 种中等贤者之石 + 纯净初等 + 1 瓶</span>${iconHTML('🔮', 1)}<span>睿智药剂 + 1 瓶任意</span>${iconHTML('🔮', 1)}<span>神秘药剂</span></div>
       <div class="upg-desc">${
-        state.finalSageOwned ? '<b style="color:#ffdca0">✅ 已拥有 · 可开启「最终炼制」浮窗</b>' :
+        state.finalSageOwned ? '<b style="color:#ffdca0">✅ 已拥有 · 贤者炼制已升级为「最终炼制」</b>' :
         !state.pureSageOwned ? '<span style="color:#6f6a8a">需要先炼制纯净的初等贤者之石</span>' :
         canFinal ? '<b style="color:#ffdca0">可炼制 · 终极仪式</b>' :
         '<span style="color:#6f6a8a">材料不足</span>'
@@ -1112,7 +1056,6 @@ function renderTier2() {
     pane.appendChild(div);
   }
 }
-
 function canCraftTier2(t) {
   for (const m of t.mats) if (state.stock[m] <= 0) return false;
   for (const b of t.base) {
@@ -1122,7 +1065,6 @@ function canCraftTier2(t) {
   }
   return true;
 }
-
 function renderGrimoire() {
   const pane = panes.grimoire;
   pane.innerHTML = '';
@@ -1220,17 +1162,15 @@ function renderGrimoire() {
       <span class="r-icon">${FINAL_SAGE.icon}</span>
       <div class="r-body">
         <div class="r-name">${FINAL_SAGE.name}</div>
-        <div class="r-mats">已解锁「最终炼制」· 可指定任意变种</div>
-        <div class="r-hint" style="color:#ffdca0;font-style:normal">🏆 炼金术的终极彼岸 · 必定成功 · 完美品质</div>
+        <div class="r-mats">贤者炼制已升级为「最终炼制」</div>
+        <div class="r-hint" style="color:#ffdca0;font-style:normal">🏆 全部变种可选 · 神秘的 100% 成功</div>
       </div>`;
     pane.appendChild(fdiv);
   }
 }
-
 function renderShelf() {
   shelfEl.innerHTML = '';
   let any = false;
-
   function addGroup(def, t2) {
     const isPrimary = isPrimaryRecipe(def.id);
     for (const v of VARIANT_ORDER) {
@@ -1239,18 +1179,14 @@ function renderShelf() {
       if (total === 0) continue;
       any = true;
       const vd = VARIANTS[v];
-
       const item = document.createElement('div');
       item.className = 'shelf-item' + (t2 ? ' t2' : '');
       if (v === 'mysterious') { item.style.borderColor = 'rgba(177,108,255,.7)'; item.style.boxShadow = '0 0 14px rgba(177,108,255,.4)'; }
       else if (v === 'pure') { item.style.borderColor = 'rgba(245,215,110,.6)'; item.style.boxShadow = '0 0 12px rgba(245,215,110,.35)'; }
       else if (v === 'refreshing') { item.style.borderColor = 'rgba(90,169,255,.6)'; item.style.boxShadow = '0 0 12px rgba(90,169,255,.35)'; }
-
       let badges = '';
       for (let i = 0; i < 3; i++) {
-        if (arr[i] > 0) {
-          badges += `<button class="badge ${QUALITY[i].key}" data-q="${i}" data-v="${v}">${QUALITY[i].name[0]} ${arr[i]}</button>`;
-        }
+        if (arr[i] > 0) badges += `<button class="badge ${QUALITY[i].key}" data-q="${i}" data-v="${v}">${QUALITY[i].name[0]} ${arr[i]}</button>`;
       }
       const vTxt = vd.name ? `<span class="s-variant" style="color:${vd.color}">${vd.icon}${vd.name}</span>` : '';
       const canRefine = isPrimary && v !== 'refreshing';
@@ -1261,7 +1197,6 @@ function renderShelf() {
         ${vTxt}
         <div class="s-badges">${badges}</div>
         ${refineBtn}`;
-
       item.querySelectorAll('.badge').forEach(b => {
         b.addEventListener('click', () => sellPotion(def.id, b.dataset.v, +b.dataset.q));
       });
@@ -1273,13 +1208,10 @@ function renderShelf() {
       shelfEl.appendChild(item);
     }
   }
-
   for (const r of RECIPES) addGroup(r, false);
   if (hasSage()) for (const t of TIER2) addGroup(t, true);
-
   if (!any) shelfEl.innerHTML = '<div class="shelf-empty">还没有库存药水。</div>';
 }
-
 function renderBrewUI() {
   if (brew.isRefine) {
     brewUI.classList.add('show');
@@ -1299,33 +1231,25 @@ function renderBrewUI() {
     brewHint.innerHTML = `贤者之力正在凝练……`;
     return;
   }
-
   const t = brew.temp;
   heatFill.style.width = t + '%';
   heatMarker.style.left = t + '%';
-
   const inZone = t >= brew.zoneMin && t <= brew.zoneMax;
   const overheat = t > 92;
-
   if (overheat) heatFill.style.background = 'linear-gradient(90deg,rgba(255,80,80,.5),rgba(220,40,40,.8))';
   else if (inZone) heatFill.style.background = 'linear-gradient(90deg,rgba(126,231,135,.5),rgba(63,185,80,.75))';
   else heatFill.style.background = 'linear-gradient(90deg,rgba(255,213,79,.45),rgba(255,152,0,.65))';
-
   cauldronEl.classList.toggle('glow-heat', inZone);
   brewProgress.style.width = brew.progress + '%';
-
   const ratio = brew.totalTime > 0.25 ? brew.goodTime / brew.totalTime : 1;
   const qi = ratio >= 0.78 ? 2 : ratio >= 0.52 ? 1 : 0;
   const q = QUALITY[qi];
-
   const avg = brew.totalTime > 0.2 ? brew.avgTempAcc / brew.totalTime : 50;
   const inZoneRatio = brew.goodTime / Math.max(0.3, brew.totalTime);
   const predicted = brew.mysteriousRoll ? 'mysterious' : predictVariant(avg, brew.escapeCount, inZoneRatio, qi);
   const pv = VARIANTS[predicted];
   const pvTxt = pv.name ? `${pv.icon}${pv.name}` : '标准';
-
   brewQuality.innerHTML = `品质：<b style="color:${q.color}">${q.name}</b> · <span style="color:${pv.color}">${pvTxt}</span>`;
-
   let hintHTML = `均温 <b style="color:#e0d0ff">${avg.toFixed(0)}°</b> · 逃离舒适区 <b style="color:#ffb677">${brew.escapeCount}</b> 次`;
   if (brew.pendingRecipe && isPrimaryRecipe(brew.pendingRecipe.id) && !brew.isSage) {
     if (isInStreak(brew.pendingRecipe.id)) {
@@ -1336,9 +1260,8 @@ function renderBrewUI() {
   }
   brewHint.innerHTML = hintHTML;
 }
-
 function renderSageSelector() {
-  if (hasMidSage()) {
+  if (hasMidSage() || state.finalSageOwned) {
     sageSelector.classList.remove('show');
     return;
   }
@@ -1364,20 +1287,29 @@ function renderSageSelector() {
     sageRow.appendChild(b);
   }
 }
-
 function renderSageCraft() {
-  if (!hasMidSage()) {
+  /* ★ 只要拥有中等或最终贤者之石即显示 */
+  if (!hasMidSage() && !state.finalSageOwned) {
     sageCraftPanel.classList.remove('show');
     return;
   }
   sageCraftPanel.classList.add('show');
 
-  const availablePotions = getSageCraftPotions();
+  /* ★ 标题 */
+  if (scTitle) {
+    if (state.finalSageOwned) {
+      scTitle.textContent = '🌟 最 终 炼 制';
+      if (scSub) scSub.textContent = '最终贤者之石之力：全部 7 种变种可选 · 必定完美 · 神秘的 100% 成功';
+    } else {
+      scTitle.textContent = '🟣 贤 者 指 定 炼 制';
+      if (scSub) scSub.textContent = '选择目标药剂与变种，投入任意 2 种以上材料即可炼制';
+    }
+  }
 
+  const availablePotions = getSageCraftPotions();
   if (state.sageCraft.potionId && !availablePotions.find(p => p.id === state.sageCraft.potionId)) {
     state.sageCraft.potionId = null;
   }
-
   const availableVariants = getSageCraftVariants(state.sageCraft.potionId);
   const isSageTarget = isSagePotionTarget(state.sageCraft.potionId);
 
@@ -1403,9 +1335,9 @@ function renderSageCraft() {
       btn.style.opacity = '.5';
       btn.title = '已拥有该变种的初级贤者之石';
     } else if (v === 'mysterious') {
-      btn.title = `神秘的 · 成功率 ${(SAGE_CRAFT.finalSageMysteryChance*100).toFixed(0)}%（失败则得到随机药剂的随机变种）`;
+      btn.title = `神秘的 · 成功率 ${(getMysteriousChance()*100).toFixed(0)}%`;
     } else if (v === 'pure') {
-      btn.title = '纯净的 · 由纯净的初等贤者之石解锁（也可由纯净连击触发）';
+      btn.title = '纯净的 · 由纯净的初等贤者之石解锁';
     } else if (isSageTarget) {
       btn.title = '初级贤者之石 · 四种变种任选';
     }
@@ -1441,25 +1373,20 @@ function renderSageCraft() {
     });
     scPotions.appendChild(btn);
   }
-
   updateSageCraftButton();
 }
-
 function updateSageCraftButton() {
   const target = state.sageCraft;
   const materialsInPot = state.cauldron.length;
-
   if (!target.variant || !target.potionId) {
     scCraftBtn.disabled = true;
     scStatus.textContent = '请选择变种与药剂';
     return;
   }
-
   const def = potionDef(target.potionId);
   const vd = VARIANTS[target.variant];
   const vTxt = vd.name ? `${vd.icon}${vd.name}` : '标准';
   const isSagePotion = isSagePotionTarget(target.potionId);
-
   if (state.cauldronPotion) {
     scCraftBtn.disabled = true;
     scStatus.textContent = '请先清空重炼台上的药剂';
@@ -1470,70 +1397,56 @@ function updateSageCraftButton() {
     scStatus.textContent = `坩埚内材料不足（${materialsInPot}/${SAGE_CRAFT.minMaterials}）`;
     return;
   }
-
   if (isSagePotion && state.sageVariants.has(target.variant)) {
     scCraftBtn.disabled = true;
-    scStatus.textContent = `你已经拥有【${vTxt}】初级贤者之石，请改选其它变种（标准 / 温和 / 炽热 / 疯狂）`;
+    scStatus.textContent = `你已经拥有【${vTxt}】初级贤者之石，请改选其它变种`;
     return;
   }
-
   if (isSagePotion && !SAGE_ALLOWED_VARIANTS.includes(target.variant)) {
     scCraftBtn.disabled = true;
     scStatus.textContent = `贤者之石只能炼制：标准 / 温和 / 炽热 / 疯狂`;
     return;
   }
-
   scCraftBtn.disabled = false;
   const speedPct = Math.round((midSageSpeedMult() - 1) * 100);
   let status = `将炼制：【${vTxt}】${def.name}`;
-  if (!isSagePotion) status += '（完美品质）';
+  if (!isSagePotion) status += state.finalSageOwned ? '（必定完美）' : '（完美品质）';
   if (target.variant === 'mysterious' && !isSagePotion) {
-    status += ` · 成功率 ${(SAGE_CRAFT.finalSageMysteryChance*100).toFixed(0)}%`;
+    status += ` · 成功率 ${(getMysteriousChance()*100).toFixed(0)}%`;
   }
-  if (isSagePotion) {
-    status += ' · 变种任选，不消耗贤者之石';
-  }
-  if (speedPct > 0) {
-    status += ` · 加速 +${speedPct}%`;
-  }
+  if (isSagePotion) status += ' · 变种任选，不消耗贤者之石';
+  if (speedPct > 0) status += ` · 加速 +${speedPct}%`;
   scStatus.textContent = status;
 }
 
+/* ============================================================
+   贤者指定炼制
+   ============================================================ */
 function startSageCraft() {
   if (brew.active) return;
   if (state.cauldronPotion) { log('请先清空重炼台上的药剂。', 'warn'); return; }
-
   const target = state.sageCraft;
   if (!target.variant || !target.potionId) { log('请先选择变种与药剂。', 'warn'); return; }
   if (state.cauldron.length < SAGE_CRAFT.minMaterials) {
     log(`贤者指定炼制需要至少 ${SAGE_CRAFT.minMaterials} 种材料。`, 'warn');
     return;
   }
-
   const def = potionDef(target.potionId);
   if (!def) { log('无效的药剂。', 'bad'); return; }
-
   const isSagePotion = isSagePotionTarget(target.potionId);
-
   if (isSagePotion) {
-    if (state.sageVariants.has(target.variant)) {
-      log('你已经拥有该变种的初级贤者之石。', 'warn'); return;
-    }
+    if (state.sageVariants.has(target.variant)) { log('你已经拥有该变种的初级贤者之石。', 'warn'); return; }
     if (!SAGE_ALLOWED_VARIANTS.includes(target.variant)) {
       log('贤者之石只能炼制：标准 / 温和 / 炽热 / 疯狂。', 'warn'); return;
     }
   }
-
   const targetVariant = target.variant;
   const targetPotionId = target.potionId;
-
   state.cauldron = [];
-
   brew.active = true;
   brew.isSageCraft = true;
   brew.sageCraftTarget = { potionId: targetPotionId, variant: targetVariant };
   brew.progress = 0;
-
   cauldronEl.classList.add('brewing', 'glow-sage');
   brewUI.classList.add('show');
   brewBtn.disabled = true;
@@ -1544,12 +1457,10 @@ function startSageCraft() {
   safe(renderIngredients, 'renderIngredients');
   safe(renderMerchantEta, 'renderMerchantEta');
   spawnBubbles(18);
-
   const vd = VARIANTS[targetVariant];
   const vTxt = vd.name ? `${vd.icon}${vd.name}` : '标准';
   const speedPct = Math.round((midSageSpeedMult() - 1) * 100);
   log(`🟣 贤者指定炼制：【${vTxt}】${def.name} ……${speedPct > 0 ? `（加速 +${speedPct}%）` : ''}`);
-
   let prog = 0;
   const speed = midSageSpeedMult();
   const tick = () => {
@@ -1562,60 +1473,45 @@ function startSageCraft() {
   };
   setTimeout(tick, 100);
 }
-
 function finishSageCraft() {
   if (!brew.isSageCraft) return;
-
   const target = brew.sageCraftTarget;
   brew.active = false;
   brew.isSageCraft = false;
   brew.sageCraftTarget = null;
   brew.progress = 0;
-
   cauldronEl.classList.remove('brewing', 'glow-sage');
   brewUI.classList.remove('show');
-
   if (!target) return;
   const def = potionDef(target.potionId);
   if (!def) return;
-
   const isSagePotion = isSagePotionTarget(target.potionId);
-
-  if (!isSagePotion) {
-    recordBrewStreak(target.potionId);
-  }
+  if (!isSagePotion) recordBrewStreak(target.potionId);
 
   let actualVariant = target.variant;
   let mysteryFailed = false;
-
   if (target.variant === 'mysterious' && !isSagePotion) {
-    if (Math.random() < SAGE_CRAFT.finalSageMysteryChance) {
+    if (Math.random() < getMysteriousChance()) {
       actualVariant = 'mysterious';
     } else {
       mysteryFailed = true;
-
       let poolIds = [
         ...RECIPES.filter(r => state.discovered.has(r.id)).map(r => r.id),
         ...TIER2.filter(t => state.discovered.has(t.id)).map(t => t.id),
       ];
-      if (poolIds.length === 0) {
-        poolIds = [...RECIPES.map(r => r.id), ...TIER2.map(t => t.id)];
-      }
+      if (poolIds.length === 0) poolIds = [...RECIPES.map(r => r.id), ...TIER2.map(t => t.id)];
       const randomPotionId = poolIds[Math.floor(Math.random() * poolIds.length)];
       const randomVariant = VARIANT_ORDER[Math.floor(Math.random() * VARIANT_ORDER.length)];
       const randomDef = potionDef(randomPotionId);
       const rvd = VARIANTS[randomVariant];
-
       potSlot(randomPotionId, randomVariant)[2]++;
       state.stats.potionsBrewed++;
       state.stats.perfectBrewed++;
       state.stats.sageCraftCount++;
       state.stats.variantsSeen.add(randomVariant);
-
       cauldronEl.classList.add('glow-fail');
       setTimeout(() => cauldronEl.classList.remove('glow-fail'), 1200);
       showEventBanner('🔮💥 神秘共鸣失败……', 'bad');
-
       const rvTxt = rvd.name ? `${rvd.icon}${rvd.name}` : '';
       log(`🔮💥 神秘共鸣失败……贤者之石失控，凝出一瓶【完美·${rvTxt}${randomDef.name}】。`, 'warn');
     }
@@ -1625,34 +1521,24 @@ function finishSageCraft() {
     let finalVariant = actualVariant;
     let pureFromStreak = false;
     if (!isSagePotion && actualVariant !== 'mysterious') {
-      if (rollPure()) {
-        finalVariant = 'pure';
-        pureFromStreak = true;
-      }
+      if (rollPure()) { finalVariant = 'pure'; pureFromStreak = true; }
     }
-
     const vd = VARIANTS[finalVariant];
     const vTxt = vd.name ? `${vd.icon}${vd.name}` : '';
 
     if (isSagePotion) {
       if (!SAGE_ALLOWED_VARIANTS.includes(finalVariant)) finalVariant = 'standard';
-
       state.sageVariants.add(finalVariant);
       state.stats.sageCraftCount++;
       state.discovered.add(SAGE.id);
-
       cauldronEl.classList.add('glow-sage');
       setTimeout(() => cauldronEl.classList.remove('glow-sage'), 1600);
       showEventBanner('🔴 贤者之石诞生！', 'good');
-
       const avd = VARIANTS[finalVariant];
       const avTxt = avd.name ? `${avd.icon}${avd.name}·` : '';
       log(`🔴✨ 贤者之力凝练出【${avTxt}初级贤者之石】！`, 'sage');
-
       if (!state.activeSageVariant || !state.sageVariants.has(state.activeSageVariant)) {
-        if (SAGE_ALLOWED_VARIANTS.includes(finalVariant)) {
-          state.activeSageVariant = finalVariant;
-        }
+        if (SAGE_ALLOWED_VARIANTS.includes(finalVariant)) state.activeSageVariant = finalVariant;
       }
     } else {
       potSlot(target.potionId, finalVariant)[2]++;
@@ -1660,7 +1546,6 @@ function finishSageCraft() {
       state.stats.perfectBrewed++;
       state.stats.sageCraftCount++;
       state.stats.variantsSeen.add(finalVariant);
-
       if (pureFromStreak) {
         cauldronEl.classList.add('glow-pure');
         setTimeout(() => cauldronEl.classList.remove('glow-pure'), 1800);
@@ -1681,13 +1566,11 @@ function finishSageCraft() {
         setTimeout(() => cauldronEl.classList.remove('glow-sage'), 900);
         log(`🟣 贤者之力凝练出【完美·${vTxt}${def.name}】`, 'sage');
       }
-
       if (isInStreak(target.potionId)) {
         log(`📈 连击 ×${state.streakCount}　下次纯净概率 ${(state.pureChance*100).toFixed(0)}%`, 'warn');
       }
     }
   }
-
   spawnBubbles(24);
   safe(render, 'render');
   safe(() => renderHeader(true), 'renderHeader');
@@ -1695,6 +1578,363 @@ function finishSageCraft() {
   safe(() => saveGame(true), 'saveGame');
 }
 
+/* ============================================================
+   ★ 初等贤者之石 · 三元素锁定小游戏
+   ============================================================ */
+const primaryGame = {
+  active: false,
+  pos: [0, 0, 0],
+  dir: [1, 1, -1],
+  locked: [false, false, false],
+  rafId: null,
+  lastTs: 0,
+  done: false,
+  icons: ['🔥', '🟡', '🌙'],
+  names: ['火之精华', '硫磺', '月光草'],
+};
+
+function openPrimaryGame() {
+  if (primaryGame.active || midGame.active) return;
+  if (brew.active) return;
+  primaryGame.active = true;
+  primaryGame.pos = [15, 35, 65];
+  primaryGame.dir = [1, 1, -1];
+  primaryGame.locked = [false, false, false];
+  primaryGame.done = false;
+
+  brew.active = true; // 锁定界面
+
+  const modal = sageGameModal;
+  modal.classList.add('show');
+  modal.innerHTML = `
+    <div class="sg-card">
+      <div class="sg-head">
+        <span class="sg-title">🔴 三 元 素 锁 定</span>
+        <button class="sg-close" id="sgCloseBtn" title="取消">✕</button>
+      </div>
+      <div class="sg-body">
+        <div class="sg-hint">
+          三个元素之影在各自的轨道上游荡。<br>
+          依次点击每条轨道，把它们锁定在绿色共鸣区内。
+        </div>
+        <div class="sg-tracks" id="sgTracks"></div>
+        <div class="sg-status" id="sgStatus">点击轨道锁定元素之影</div>
+      </div>
+    </div>
+  `;
+
+  const tracks = $('sgTracks');
+  for (let i = 0; i < 3; i++) {
+    const track = document.createElement('div');
+    track.className = 'sg-track';
+    track.dataset.i = i;
+    track.innerHTML = `
+      <span class="sg-icon">${primaryGame.icons[i]}</span>
+      <div class="sg-rail">
+        <div class="sg-zone" style="left:${PRIMARY_GAME.zoneMin}%;width:${PRIMARY_GAME.zoneMax - PRIMARY_GAME.zoneMin}%"></div>
+        <div class="sg-pointer" id="sgPtr${i}"></div>
+      </div>
+    `;
+    track.addEventListener('click', () => lockPrimaryTrack(i));
+    tracks.appendChild(track);
+  }
+  $('sgCloseBtn').addEventListener('click', cancelPrimaryGame);
+
+  primaryGame.lastTs = performance.now();
+  primaryGame.rafId = requestAnimationFrame(primaryGameLoop);
+}
+function lockPrimaryTrack(i) {
+  if (!primaryGame.active || primaryGame.locked[i]) return;
+  primaryGame.locked[i] = true;
+  const track = document.querySelectorAll('.sg-track')[i];
+  if (track) track.classList.add('locked');
+  if (primaryGame.locked.every(v => v)) setTimeout(judgePrimaryGame, 500);
+}
+function primaryGameLoop(ts) {
+  if (!primaryGame.active) return;
+  const dt = Math.min((ts - primaryGame.lastTs) / 1000, 0.05);
+  primaryGame.lastTs = ts;
+  for (let i = 0; i < 3; i++) {
+    if (primaryGame.locked[i]) continue;
+    primaryGame.pos[i] += primaryGame.dir[i] * PRIMARY_GAME.speeds[i] * dt;
+    if (primaryGame.pos[i] >= 100) { primaryGame.pos[i] = 100; primaryGame.dir[i] = -1; }
+    else if (primaryGame.pos[i] <= 0) { primaryGame.pos[i] = 0; primaryGame.dir[i] = 1; }
+    const ptr = $('sgPtr' + i);
+    if (ptr) ptr.style.left = primaryGame.pos[i] + '%';
+  }
+  primaryGame.rafId = requestAnimationFrame(primaryGameLoop);
+}
+function judgePrimaryGame() {
+  if (!primaryGame.active || primaryGame.done) return;
+  primaryGame.done = true;
+  primaryGame.active = false;
+  if (primaryGame.rafId) { try { cancelAnimationFrame(primaryGame.rafId); } catch(e){} primaryGame.rafId = null; }
+
+  let ok = 0;
+  for (let i = 0; i < 3; i++) {
+    if (primaryGame.pos[i] >= PRIMARY_GAME.zoneMin && primaryGame.pos[i] <= PRIMARY_GAME.zoneMax) ok++;
+  }
+  const allOk = ok === 3;
+  const statusEl = $('sgStatus');
+  if (statusEl) {
+    statusEl.innerHTML = allOk
+      ? '<b style="color:#7ee787">✨ 三元素共鸣！贤者之石凝练而成。</b>'
+      : `<b style="color:#ff7b72">💥 只有 ${ok}/3 元素落入共鸣区……炼制失败。</b>`;
+  }
+  setTimeout(() => {
+    closeSageGame();
+    if (allOk) onPrimaryGameSuccess();
+    else onPrimaryGameFail();
+  }, 1500);
+}
+function cancelPrimaryGame() {
+  if (!primaryGame.active) return;
+  primaryGame.active = false;
+  if (primaryGame.rafId) { try { cancelAnimationFrame(primaryGame.rafId); } catch(e){} primaryGame.rafId = null; }
+  closeSageGame();
+  for (const id of state.cauldron) {
+    if (ING[id]) state.stock[id] = Math.min(ING[id].max, state.stock[id] + 1);
+  }
+  state.cauldron = [];
+  brew.active = false;
+  log('取消了贤者之石的炼制，材料已退回。', 'warn');
+  safe(render, 'render');
+  safe(() => saveGame(true), 'saveGame');
+}
+function closeSageGame() {
+  sageGameModal.classList.remove('show');
+  sageGameModal.innerHTML = '';
+}
+function onPrimaryGameSuccess() {
+  // 消耗坩埚材料
+  state.cauldron = [];
+  brew.active = false;
+
+  const variant = 'standard';
+  state.sageVariants.add(variant);
+  state.discovered.add(SAGE.id);
+  if (!state.activeSageVariant || !state.sageVariants.has(state.activeSageVariant)) {
+    state.activeSageVariant = variant;
+  }
+  state.gold += 200;
+  state.rep += 50;
+
+  cauldronEl.classList.add('glow-sage');
+  setTimeout(() => cauldronEl.classList.remove('glow-sage'), 1600);
+  showEventBanner('🔴 贤者之石诞生！', 'good');
+  log('🔴✨ 三元素共鸣成功，初级贤者之石凝练而成！', 'sage');
+  log('⚗️ 现在可以自动炼制，也可以尝试炼制中等贤者之石。', 'sage');
+
+  spawnBubbles(24);
+  safe(render, 'render');
+  safe(() => renderHeader(true), 'renderHeader');
+  safe(checkAchievements, 'checkAchievements');
+  safe(() => saveGame(true), 'saveGame');
+}
+function onPrimaryGameFail() {
+  // 退还坩埚材料
+  for (const id of state.cauldron) {
+    if (ING[id]) state.stock[id] = Math.min(ING[id].max, state.stock[id] + 1);
+  }
+  state.cauldron = [];
+  brew.active = false;
+  cauldronEl.classList.add('glow-fail');
+  setTimeout(() => cauldronEl.classList.remove('glow-fail'), 1200);
+  showEventBanner('💥 共鸣失败……', 'bad');
+  log('💥 三元素未能共鸣，材料已退回。', 'bad');
+  safe(render, 'render');
+  safe(() => saveGame(true), 'saveGame');
+}
+
+/* ============================================================
+   ★ 中等贤者之石 · 精准滴定小游戏
+   ============================================================ */
+const midGame = {
+  active: false,
+  stage: 0,
+  water: 30,
+  injecting: false,
+  targetMin: 40,
+  targetMax: 60,
+  requiredHold: 3,
+  holdTime: 0,
+  rafId: null,
+  lastTs: 0,
+  sageVariant: 'standard',  // 消耗的初级贤者之石变种
+  wisdomVariant: null,      // 消耗的完美智慧药剂变种
+};
+
+function openMidGame(sageVariant) {
+  if (primaryGame.active || midGame.active) return;
+  if (brew.active) return;
+
+  // 找一瓶完美智慧药剂
+  const wisdomVariant = findPerfectWisdomVariant();
+  if (!wisdomVariant) {
+    log('需要一瓶完美品质的智慧药剂。', 'warn');
+    return;
+  }
+
+  midGame.active = true;
+  midGame.stage = 0;
+  midGame.water = MID_GAME.startWater;
+  midGame.holdTime = 0;
+  midGame.injecting = false;
+  midGame.sageVariant = sageVariant;
+  midGame.wisdomVariant = wisdomVariant;
+
+  // 先消耗材料
+  if (!state.sageVariants.has(sageVariant)) { log('缺少该变种的初级贤者之石。', 'warn'); midGame.active = false; return; }
+  state.sageVariants.delete(sageVariant);
+  potSlot('wisdom', wisdomVariant)[2]--;
+
+  brew.active = true; // 锁定
+  applyMidGameStage();
+
+  sageGameModal.classList.add('show');
+  sageGameModal.innerHTML = `
+    <div class="sg-card">
+      <div class="sg-head">
+        <span class="sg-title">🟣 精 准 滴 定</span>
+        <button class="sg-close" id="sgCloseBtn" title="取消">✕</button>
+      </div>
+      <div class="sg-body">
+        <div class="sg-hint">
+          按住「注入」提升液位，让液位稳定在绿色区间。<br>
+          连续保持 <b id="sgHoldTarget">3</b> 秒即可通过当前阶段。
+        </div>
+        <div class="sg-vessel">
+          <div class="sg-water" id="sgWater"></div>
+          <div class="sg-target" id="sgTarget"></div>
+        </div>
+        <div class="sg-row">
+          <div class="sg-info">阶段 <b id="sgStage">1/3</b></div>
+          <div class="sg-info">保持 <b id="sgHold">0.0</b>s</div>
+        </div>
+        <button class="sg-inject-btn" id="sgInjectBtn">按 住 注 入</button>
+        <div class="sg-status" id="sgStatus">开始注入能量……</div>
+      </div>
+    </div>
+  `;
+
+  const injectBtn = $('sgInjectBtn');
+  injectBtn.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    midGame.injecting = true;
+    injectBtn.classList.add('active');
+  });
+  const stopInject = () => {
+    midGame.injecting = false;
+    injectBtn.classList.remove('active');
+  };
+  injectBtn.addEventListener('pointerup', stopInject);
+  injectBtn.addEventListener('pointercancel', stopInject);
+  injectBtn.addEventListener('pointerleave', stopInject);
+  window.addEventListener('pointerup', stopInject);
+
+  $('sgCloseBtn').addEventListener('click', cancelMidGame);
+
+  updateMidGameUI();
+  midGame.lastTs = performance.now();
+  midGame.rafId = requestAnimationFrame(midGameLoop);
+}
+function applyMidGameStage() {
+  const idx = Math.min(midGame.stage, MID_GAME.stages.length - 1);
+  const cfg = MID_GAME.stages[idx];
+  midGame.targetMin = cfg.min;
+  midGame.targetMax = cfg.max;
+  midGame.requiredHold = cfg.hold;
+  midGame.holdTime = 0;
+  const t = $('sgTarget');
+  if (t) {
+    t.style.bottom = cfg.min + '%';
+    t.style.height = (cfg.max - cfg.min) + '%';
+  }
+  const s = $('sgStage');
+  if (s) s.textContent = (midGame.stage + 1) + '/' + MID_GAME.stages.length;
+  const h = $('sgHoldTarget');
+  if (h) h.textContent = cfg.hold;
+}
+function midGameLoop(ts) {
+  if (!midGame.active) return;
+  const dt = Math.min((ts - midGame.lastTs) / 1000, 0.05);
+  midGame.lastTs = ts;
+
+  if (midGame.injecting) midGame.water += MID_GAME.injectRate * dt;
+  else midGame.water -= MID_GAME.fallRate * dt;
+  midGame.water = Math.max(0, Math.min(100, midGame.water));
+
+  const inZone = midGame.water >= midGame.targetMin && midGame.water <= midGame.targetMax;
+  if (inZone) midGame.holdTime += dt;
+  else midGame.holdTime = 0;
+
+  if (midGame.holdTime >= midGame.requiredHold) {
+    midGame.stage++;
+    if (midGame.stage >= MID_GAME.stages.length) {
+      // 全部通过
+      midGame.active = false;
+      if (midGame.rafId) { try { cancelAnimationFrame(midGame.rafId); } catch(e){} midGame.rafId = null; }
+      const statusEl = $('sgStatus');
+      if (statusEl) statusEl.innerHTML = '<b style="color:#7ee787">✨ 滴定成功！</b>';
+      setTimeout(() => {
+        closeSageGame();
+        onMidGameSuccess();
+      }, 1200);
+      return;
+    } else {
+      applyMidGameStage();
+      midGame.water = MID_GAME.startWater;
+    }
+  }
+  updateMidGameUI();
+  midGame.rafId = requestAnimationFrame(midGameLoop);
+}
+function updateMidGameUI() {
+  const w = $('sgWater');
+  if (w) w.style.height = midGame.water + '%';
+  const h = $('sgHold');
+  if (h) h.textContent = midGame.holdTime.toFixed(1);
+}
+function cancelMidGame() {
+  if (!midGame.active) return;
+  midGame.active = false;
+  if (midGame.rafId) { try { cancelAnimationFrame(midGame.rafId); } catch(e){} midGame.rafId = null; }
+  closeSageGame();
+  brew.active = false;
+  // 退回消耗的材料
+  state.sageVariants.add(midGame.sageVariant);
+  if (midGame.wisdomVariant) potSlot('wisdom', midGame.wisdomVariant)[2]++;
+  log('取消了中等贤者之石的炼制，材料已退回。', 'warn');
+  safe(render, 'render');
+  safe(() => saveGame(true), 'saveGame');
+}
+function onMidGameSuccess() {
+  brew.active = false;
+  const variant = midGame.sageVariant;
+  if (!state.midSageVariants.has(variant)) {
+    state.midSageVariants.add(variant);
+    state.stats.midSageCrafted++;
+  }
+  cauldronEl.classList.add('glow-pure');
+  setTimeout(() => cauldronEl.classList.remove('glow-pure'), 1600);
+  showEventBanner('🟣 中等贤者之石诞生！', 'mid');
+  const vd = VARIANTS[variant];
+  const vLabel = vd.name ? `${vd.icon}${vd.name}` : '标准';
+  log(`✨✨ 精准滴定成功！获得【${vLabel}中等贤者之石】`, 'mid');
+  log('🟣 现在可以在坩埚下方的「贤者指定」中指定药剂与变种炼制。', 'sage');
+  const spd = Math.round((midSageSpeedMult() - 1) * 100);
+  log(`⏩ 炼制加速 +${spd}%。`, 'sage');
+  if (!SAGE_ALLOWED_VARIANTS.includes(state.activeSageVariant)) state.activeSageVariant = variant;
+
+  safe(render, 'render');
+  safe(() => renderHeader(true), 'renderHeader');
+  checkAchievements();
+  safe(() => saveGame(true), 'saveGame');
+}
+
+/* ============================================================
+   主渲染
+   ============================================================ */
 function render() {
   safe(renderIngredients, 'renderIngredients');
   safe(renderCauldron, 'renderCauldron');
@@ -1710,14 +1950,13 @@ function render() {
   safe(() => renderHeader(false), 'renderHeader');
   safe(renderMerchantEta, 'renderMerchantEta');
   safe(renderNews, 'renderNews');
-  safe(renderFinalCraft, 'renderFinalCraft');
 }
 
 /* ============================================================
    材料交互
    ============================================================ */
 function addToCauldron(id) {
-  if (brew.active) return;
+  if (brew.active || primaryGame.active || midGame.active) return;
   if (state.cauldronPotion) { log('请先清空重炼台上的药剂。', 'warn'); return; }
   if (state.stock[id] <= 0) { log(`${ING[id].name}不足，正在凝聚中…`, 'warn'); return; }
   if (state.cauldron.length >= 3) { log('坩埚已满，请先调配或清空。', 'warn'); return; }
@@ -1730,13 +1969,10 @@ function addToCauldron(id) {
   safe(renderCauldron, 'renderCauldron');
   safe(renderIngredients, 'renderIngredients');
   safe(updateSageCraftButton, 'updateSageCraftButton');
-  safe(renderFinalCraft, 'renderFinalCraft');
   safe(() => saveGame(true), 'saveGame');
 }
-
 function clearCauldron() {
-  if (brew.active) return;
-
+  if (brew.active || primaryGame.active || midGame.active) return;
   if (state.cauldronPotion) {
     const p = state.cauldronPotion;
     potSlot(p.id, p.variant)[p.quality]++;
@@ -1746,11 +1982,9 @@ function clearCauldron() {
     safe(renderShelf, 'renderShelf');
     safe(renderIngredients, 'renderIngredients');
     safe(updateSageCraftButton, 'updateSageCraftButton');
-    safe(renderFinalCraft, 'renderFinalCraft');
     safe(() => saveGame(true), 'saveGame');
     return;
   }
-
   for (const id of state.cauldron) {
     if (ING[id]) state.stock[id] = Math.min(ING[id].max, state.stock[id] + 1);
   }
@@ -1759,17 +1993,13 @@ function clearCauldron() {
   safe(renderCauldron, 'renderCauldron');
   safe(renderIngredients, 'renderIngredients');
   safe(updateSageCraftButton, 'updateSageCraftButton');
-  safe(renderFinalCraft, 'renderFinalCraft');
   safe(() => saveGame(true), 'saveGame');
 }
-
-/* ★ 买入材料：使用动态价格 */
 function buyIngredient(id) {
   const d = ING[id];
-  if (brew.active) return;
+  if (brew.active || primaryGame.active || midGame.active) return;
   if (state.cauldronPotion) { log('请先清空重炼台上的药剂。', 'warn'); return; }
   if (state.stock[id] >= d.max) { log(`${d.name}库存已满。`, 'warn'); return; }
-
   const price = ingPrice(id);
   if (state.gold < price) { log(`金币不足（需要 ${price}💰）。`, 'warn'); return; }
   state.gold -= price;
@@ -1792,7 +2022,6 @@ function predictVariant(avgTemp, escapeCount, inZoneRatio, quality) {
   if (escapeCount >= T.madEscapes) return 'mad';
   return 'standard';
 }
-
 function computeZoneCenter(recipe) {
   const first = state.cauldron[0];
   let shift = 0;
@@ -1803,14 +2032,12 @@ function computeZoneCenter(recipe) {
   if (recipe === SAGE) return 50;
   return 60 + shift;
 }
-
 function scheduleNextDrift(first) {
   const D = ZONE_DRIFT;
   brew.zoneDriftIn = first
     ? D.firstDelayMin + Math.random() * (D.firstDelayMax - D.firstDelayMin)
     : D.intervalMin + Math.random() * (D.intervalMax - D.intervalMin);
 }
-
 function maybeDriftZone(dtMs) {
   if (brew.isSage) return;
   brew.zoneDriftIn -= dtMs;
@@ -1843,43 +2070,34 @@ function maybeDriftZone(dtMs) {
    重炼
    ============================================================ */
 function startRefineFromShelf(recipeId, variant) {
-  if (brew.active) return;
+  if (brew.active || primaryGame.active || midGame.active) return;
   if (state.cauldronPotion) { log('重炼台上已经有药剂了。', 'warn'); return; }
   if (state.cauldron.length > 0) { log('请先清空坩埚中的材料。', 'warn'); return; }
   if (variant === 'refreshing') { log('提神的药剂无法再次重炼。', 'warn'); return; }
   if (!isPrimaryRecipe(recipeId)) { log('该药剂无法重炼。', 'warn'); return; }
-
   const arr = potSlot(recipeId, variant);
   let qi = -1;
   for (let i = 0; i < 3; i++) if (arr[i] > 0) { qi = i; break; }
   if (qi < 0) return;
-
   arr[qi]--;
   state.cauldronPotion = { id: recipeId, variant, quality: qi };
-
   const def = potionDef(recipeId);
   const vd = VARIANTS[variant];
-  const vTxt = vd.name ? vd.name : '';
-  log(`将【${QUALITY[qi].name}·${vTxt}${def.name}】送上重炼台。`);
-
+  log(`将【${QUALITY[qi].name}·${vd.name}${def.name}】送上重炼台。`);
   safe(renderCauldron, 'renderCauldron');
   safe(renderShelf, 'renderShelf');
   safe(renderIngredients, 'renderIngredients');
   safe(updateSageCraftButton, 'updateSageCraftButton');
-  safe(renderFinalCraft, 'renderFinalCraft');
   safe(() => saveGame(true), 'saveGame');
 }
-
 function startRefine() {
   const p = state.cauldronPotion;
   if (!p) return;
   if (p.variant === 'refreshing') { log('提神的药剂无法再次重炼。', 'warn'); return; }
   if (brew.active) return;
-
   brew.active = true;
   brew.isRefine = true;
   brew.refineSuccess = Math.random() < REFINE_CHANCE;
-
   cauldronEl.classList.add('brewing', 'glow-refine');
   brewUI.classList.add('show');
   brewBtn.disabled = true;
@@ -1887,14 +2105,11 @@ function startRefine() {
   safe(renderBrewUI, 'renderBrewUI');
   spawnBubbles(12);
   log('💧 重炼中……');
-
   setTimeout(() => {
     cauldronEl.classList.remove('brewing', 'glow-refine');
     brewUI.classList.remove('show');
-
     const def = potionDef(p.id);
     const vd = VARIANTS[p.variant];
-
     try {
       if (brew.refineSuccess) {
         cauldronEl.classList.add('glow-ok');
@@ -1910,20 +2125,17 @@ function startRefine() {
         potSlot(p.id, p.variant)[p.quality]++;
         log(`💧 重炼未产生变化，【${QUALITY[p.quality].name}·${vd.name}${def.name}】原样退回。`, 'warn');
       }
-    } catch (e) {
-      console.error('refine 错误', e);
-    } finally {
+    } catch (e) { console.error('refine 错误', e); }
+    finally {
       state.cauldronPotion = null;
       brew.active = false;
       brew.isRefine = false;
       brew.refineSuccess = false;
-
       safe(renderCauldron, 'renderCauldron');
       safe(renderShelf, 'renderShelf');
       safe(renderIngredients, 'renderIngredients');
       safe(() => renderHeader(true), 'renderHeader');
       safe(updateSageCraftButton, 'updateSageCraftButton');
-      safe(renderFinalCraft, 'renderFinalCraft');
       safe(checkAchievements, 'checkAchievements');
       safe(() => saveGame(true), 'saveGame');
     }
@@ -1934,14 +2146,10 @@ function startRefine() {
    炼药
    ============================================================ */
 function startBrew() {
-  if (brew.active) return;
+  if (brew.active || primaryGame.active || midGame.active) return;
+  if (state.cauldronPotion) { startRefine(); return; }
 
-  if (state.cauldronPotion) {
-    startRefine();
-    return;
-  }
-
-  if (hasMidSage() && state.sageCraft.variant && state.sageCraft.potionId && state.cauldron.length >= SAGE_CRAFT.minMaterials) {
+  if ((hasMidSage() || state.finalSageOwned) && state.sageCraft.variant && state.sageCraft.potionId && state.cauldron.length >= SAGE_CRAFT.minMaterials) {
     startSageCraft();
     return;
   }
@@ -1964,12 +2172,27 @@ function startBrew() {
     return;
   }
 
-  brew.mysteriousRoll = isSage ? false : (Math.random() < MYSTERIOUS_CHANCE);
+  /* ★ 初级贤者之石：进入三元素锁定小游戏 */
+  if (isSage) {
+    if (state.sageVariants.size > 0) {
+      log('你已经拥有初级贤者之石，无需再炼制。', 'warn');
+      for (const id of state.cauldron) {
+        if (ING[id]) state.stock[id] = Math.min(ING[id].max, state.stock[id] + 1);
+      }
+      state.cauldron = [];
+      safe(render, 'render');
+      return;
+    }
+    log('🔴 三元素开始共鸣……');
+    setTimeout(() => openPrimaryGame(), 300);
+    return;
+  }
 
-  if (hasSage() && !isSage) { autoBrew(recipe); return; }
-  startManualBrew(recipe, isSage);
+  brew.mysteriousRoll = Math.random() < MYSTERIOUS_CHANCE;
+
+  if (hasSage()) { autoBrew(recipe); return; }
+  startManualBrew(recipe, false);
 }
-
 function startManualBrew(recipe, isSage) {
   brew.active = true;
   brew.isSage = isSage;
@@ -1986,72 +2209,54 @@ function startManualBrew(recipe, isSage) {
   brew.maxTemp = 20;
   brew.minTemp = 20;
   brew.driftLogged = false;
-
   const center = computeZoneCenter(recipe);
   const zoneW = isSage ? 10 : (22 + state.upgrades.thermo * 5);
   brew.zoneCenter = center;
   brew.zoneMin = center - zoneW / 2;
   brew.zoneMax = center + zoneW / 2;
-
   heatZone.style.left = brew.zoneMin + '%';
   heatZone.style.width = zoneW + '%';
-
   scheduleNextDrift(true);
-
   brewUI.classList.add('show');
   cauldronEl.classList.add('brewing');
   safe(renderIngredients, 'renderIngredients');
   safe(renderCauldron, 'renderCauldron');
   safe(renderBrewUI, 'renderBrewUI');
   safe(renderMerchantEta, 'renderMerchantEta');
-
-  if (isSage) log('🔴 坩埚中的液体开始自主发光……这是最后一步。');
-  else log('🔥 坩埚开始沸腾……按住加热，将温度保持在绿色区域。');
-
+  log('🔥 坩埚开始沸腾……按住加热，将温度保持在绿色区域。');
   brew.lastTs = performance.now();
   brew.rafId = requestAnimationFrame(brewLoop);
 }
-
 function brewLoop(ts) {
   if (!brew.active) return;
   const dt = Math.min((ts - brew.lastTs) / 1000, 0.05);
   brew.lastTs = ts;
   const dtMs = dt * 1000;
-
   const rate = brew.heating ? 50 : -32;
   const newTemp = Math.max(0, Math.min(100, brew.temp + rate * dt));
-
   const wasIn = brew.temp >= brew.zoneMin && brew.temp <= brew.zoneMax;
   const isIn  = newTemp >= brew.zoneMin && newTemp <= brew.zoneMax;
   if (wasIn && !isIn) brew.escapeCount++;
-
   brew.temp = newTemp;
   if (brew.temp > brew.maxTemp) brew.maxTemp = brew.temp;
   if (brew.temp < brew.minTemp) brew.minTemp = brew.temp;
-
   brew.totalTime += dt;
   brew.avgTempAcc += brew.temp * dt;
   if (isIn) brew.goodTime += dt;
-
   maybeDriftZone(dtMs);
-
   const overheat = brew.temp > 92;
   let pr;
   if (isIn) pr = 38 * sageMult() * midSageSpeedMult();
   else if (overheat) pr = -55;
   else pr = -20;
   brew.progress = Math.max(0, Math.min(100, brew.progress + pr * dt));
-
   if (isIn && Math.random() < 0.35) spawnBubbles(1);
-
   safe(renderBrewUI, 'renderBrewUI');
   if (brew.progress >= 100) { finishBrew(); return; }
   brew.rafId = requestAnimationFrame(brewLoop);
 }
-
 function finishBrew() {
   if (!brew.active && !brew.pendingRecipe) return;
-
   const recipe = brew.pendingRecipe;
   const isSage = brew.isSage;
   const mysteriousRoll = brew.mysteriousRoll;
@@ -2060,20 +2265,16 @@ function finishBrew() {
   const q = QUALITY[qi];
   const avgTemp = brew.totalTime > 0.1 ? brew.avgTempAcc / brew.totalTime : 50;
   const escapeCount = brew.escapeCount;
-
   brew.active = false;
   if (brew.rafId) { try { cancelAnimationFrame(brew.rafId); } catch(e){} brew.rafId = null; }
   brew.pendingRecipe = null;
   brew.isSage = false;
   brew.mysteriousRoll = false;
   brew.progress = 0;
-
   cauldronEl.classList.remove('brewing', 'glow-heat');
   heatBtn.classList.remove('active');
   brewUI.classList.remove('show');
-
   let success = false;
-
   try {
     if (!recipe) {
       log('⚠️ 炼药异常：配方丢失，材料已退回。', 'warn');
@@ -2082,24 +2283,12 @@ function finishBrew() {
       }
       return;
     }
-
     let variant;
-
     if (!isSage && isPrimaryRecipe(recipe.id)) recordBrewStreak(recipe.id);
-
-    if (isSage) {
-      variant = predictVariant(avgTemp, escapeCount, ratio, qi);
-      if (!SAGE_ALLOWED_VARIANTS.includes(variant)) variant = 'standard';
-    } else if (mysteriousRoll) {
-      variant = 'mysterious';
-    } else if (isPrimaryRecipe(recipe.id) && rollPure()) {
-      variant = 'pure';
-    } else {
-      variant = predictVariant(avgTemp, escapeCount, ratio, qi);
-    }
-
+    if (mysteriousRoll) variant = 'mysterious';
+    else if (isPrimaryRecipe(recipe.id) && rollPure()) variant = 'pure';
+    else variant = predictVariant(avgTemp, escapeCount, ratio, qi);
     const vd = VARIANTS[variant];
-
     if (variant === 'mysterious') {
       cauldronEl.classList.add('glow-mystery');
       setTimeout(() => cauldronEl.classList.remove('glow-mystery'), 2000);
@@ -2113,49 +2302,27 @@ function finishBrew() {
       setTimeout(() => cauldronEl.classList.remove('glow-ok'), 800);
     }
     spawnBubbles(20);
-
-    if (isSage) {
-      state.sageVariants.add(variant);
-      state.discovered.add(SAGE.id);
-      cauldronEl.classList.add('glow-sage');
-      setTimeout(() => cauldronEl.classList.remove('glow-sage'), 1600);
-      const vName = vd.name ? `${vd.icon}${vd.name}·` : '';
-      log(`🔴 炼成了【${vName}初级贤者之石】！`, 'sage');
-      log('⚗️ 该变种药剂现在可以自动炼制。', 'sage');
-      state.gold += 200;
-      state.rep += 50;
-      if (!state.activeSageVariant || !state.sageVariants.has(state.activeSageVariant)) {
-        if (SAGE_ALLOWED_VARIANTS.includes(variant)) state.activeSageVariant = variant;
-      }
+    const isNew = !state.discovered.has(recipe.id);
+    state.discovered.add(recipe.id);
+    potSlot(recipe.id, variant)[qi]++;
+    state.stats.potionsBrewed++;
+    if (qi === 2) state.stats.perfectBrewed++;
+    state.stats.variantsSeen.add(variant);
+    const vTxt = vd.name ? `${vd.icon}${vd.name}` : '';
+    if (variant === 'mysterious') log(`🔮✨ 神秘之力涌入坩埚！炼成【${q.name}·${vTxt}${recipe.name}】`, 'mystery');
+    else if (variant === 'pure') log(`✨ 连击达成！炼成【${q.name}·${vTxt}${recipe.name}】`, 'pure');
+    else if (isNew) {
+      state.gold += 30;
+      state.rep += 15;
+      log(`✨ 首次调配出【${q.name}·${vTxt}${recipe.name}】！奖励 30💰 15🏅`, 'ok');
+      checkAllUnlocked();
     } else {
-      const isNew = !state.discovered.has(recipe.id);
-      state.discovered.add(recipe.id);
-      potSlot(recipe.id, variant)[qi]++;
-
-      state.stats.potionsBrewed++;
-      if (qi === 2) state.stats.perfectBrewed++;
-      state.stats.variantsSeen.add(variant);
-
-      const vTxt = vd.name ? `${vd.icon}${vd.name}` : '';
-      if (variant === 'mysterious') {
-        log(`🔮✨ 神秘之力涌入坩埚！炼成【${q.name}·${vTxt}${recipe.name}】`, 'mystery');
-      } else if (variant === 'pure') {
-        log(`✨ 连击达成！炼成【${q.name}·${vTxt}${recipe.name}】`, 'pure');
-      } else if (isNew) {
-        state.gold += 30;
-        state.rep += 15;
-        log(`✨ 首次调配出【${q.name}·${vTxt}${recipe.name}】！奖励 30💰 15🏅`, 'ok');
-        checkAllUnlocked();
-      } else {
-        state.rep += 2;
-        log(`调配出【${q.name}·${vTxt}${recipe.name}】（温度契合度 ${(ratio*100).toFixed(0)}%）`, qi === 2 ? 'ok' : '');
-      }
-
-      if (isPrimaryRecipe(recipe.id) && isInStreak(recipe.id)) {
-        log(`📈 连击 ×${state.streakCount}　下次纯净概率 ${(state.pureChance*100).toFixed(0)}%`, 'warn');
-      }
+      state.rep += 2;
+      log(`调配出【${q.name}·${vTxt}${recipe.name}】（温度契合度 ${(ratio*100).toFixed(0)}%）`, qi === 2 ? 'ok' : '');
     }
-
+    if (isPrimaryRecipe(recipe.id) && isInStreak(recipe.id)) {
+      log(`📈 连击 ×${state.streakCount}　下次纯净概率 ${(state.pureChance*100).toFixed(0)}%`, 'warn');
+    }
     success = true;
   } catch (e) {
     console.error('finishBrew 内部错误:', e);
@@ -2174,17 +2341,14 @@ function finishBrew() {
     safe(() => saveGame(true), 'saveGame');
   }
 }
-
 function autoBrew(recipe) {
   const sageVar = pickSageVariantFor();
   if (!sageVar) { startManualBrew(recipe, false); return; }
-
   brew.active = true;
   brew.isSage = false;
   brew.isRefine = false;
   brew.isSageCraft = false;
   brew.pendingRecipe = recipe;
-
   cauldronEl.classList.add('brewing', 'glow-sage');
   brewBtn.disabled = true;
   clearBtn.disabled = true;
@@ -2193,20 +2357,15 @@ function autoBrew(recipe) {
   spawnBubbles(14);
   const vd = VARIANTS[sageVar];
   log(`🔴 贤者之石闪耀（${vd.name || '标准'}），炼金术自动运转……`);
-
   setTimeout(() => {
     const mysteriousRoll = brew.mysteriousRoll;
-
     brew.active = false;
     brew.pendingRecipe = null;
     brew.mysteriousRoll = false;
-
     let success = false;
     try {
       cauldronEl.classList.remove('brewing', 'glow-sage');
-
       if (isPrimaryRecipe(recipe.id)) recordBrewStreak(recipe.id);
-
       let variant;
       if (mysteriousRoll) variant = 'mysterious';
       else if (isPrimaryRecipe(recipe.id) && rollPure()) variant = 'pure';
@@ -2215,7 +2374,6 @@ function autoBrew(recipe) {
         if (!SAGE_ALLOWED_VARIANTS.includes(variant)) variant = 'standard';
       }
       const vd2 = VARIANTS[variant];
-
       if (variant === 'mysterious') {
         cauldronEl.classList.add('glow-mystery');
         setTimeout(() => cauldronEl.classList.remove('glow-mystery'), 2000);
@@ -2228,15 +2386,12 @@ function autoBrew(recipe) {
         cauldronEl.classList.add('glow-ok');
         setTimeout(() => cauldronEl.classList.remove('glow-ok'), 700);
       }
-
       const isNew = !state.discovered.has(recipe.id);
       state.discovered.add(recipe.id);
       potSlot(recipe.id, variant)[2]++;
-
       state.stats.potionsBrewed++;
       state.stats.perfectBrewed++;
       state.stats.variantsSeen.add(variant);
-
       const vTxt = vd2.name ? `${vd2.icon}${vd2.name}` : '';
       if (variant === 'mysterious') log(`🔮✨ 贤者之石凝练出【完美·${vTxt}${recipe.name}】——神秘降临！`, 'mystery');
       else if (variant === 'pure') log(`✨ 连击达成！贤者之石凝练出【完美·${vTxt}${recipe.name}】`, 'pure');
@@ -2249,7 +2404,6 @@ function autoBrew(recipe) {
         state.rep += 2;
         log(`贤者之石凝练出【完美·${vTxt}${recipe.name}】`, 'ok');
       }
-
       if (isPrimaryRecipe(recipe.id) && isInStreak(recipe.id)) {
         log(`📈 连击 ×${state.streakCount}　下次纯净概率 ${(state.pureChance*100).toFixed(0)}%`, 'warn');
       }
@@ -2272,7 +2426,6 @@ function autoBrew(recipe) {
     }
   }, 900);
 }
-
 heatBtn.addEventListener('pointerdown', e => {
   e.preventDefault();
   if (!brew.active) return;
@@ -2290,10 +2443,8 @@ window.addEventListener('blur', stopHeat);
 function craftTier2(t) {
   if (!hasSage()) return;
   if (!canCraftTier2(t)) { log('材料或药剂不足，无法加工。', 'warn'); return; }
-
   let consumedVariant = 'standard';
   let foundBase = false;
-
   for (const b of t.base) {
     let picked = null;
     for (const v of VARIANT_ORDER) if (potTotal(b, v) > 0) { picked = v; break; }
@@ -2303,24 +2454,17 @@ function craftTier2(t) {
     for (let qi = 0; qi < 3; qi++) if (arr[qi] > 0) { arr[qi]--; break; }
   }
   for (const m of t.mats) state.stock[m]--;
-
   let outVariant = consumedVariant;
   const sagePick = state.sageCraft && state.sageCraft.variant;
-  if (sagePick && VARIANTS[sagePick] && sagePick !== 'mysterious') {
-    outVariant = sagePick;
-  } else if (outVariant === 'standard' && Math.random() < 0.18) {
-    outVariant = 'pure';
-  }
-
+  if (sagePick && VARIANTS[sagePick] && sagePick !== 'mysterious') outVariant = sagePick;
+  else if (outVariant === 'standard' && Math.random() < 0.18) outVariant = 'pure';
   potSlot(t.id, outVariant)[2]++;
   state.rep += 5;
   state.stats.tier2Crafted++;
   state.stats.variantsSeen.add(outVariant);
-
   cauldronEl.classList.add('glow-sage');
   setTimeout(() => cauldronEl.classList.remove('glow-sage'), 900);
   spawnBubbles(12);
-
   const vd = VARIANTS[outVariant];
   const vTxt = vd.name ? `${vd.icon}${vd.name}` : '';
   log(`⚗️ 二次加工成功：【完美·${vTxt}${t.name}】`, 'sage');
@@ -2335,49 +2479,11 @@ function craftTier2(t) {
 function craftMidSage(sageVariant) {
   if (!state.sageVariants.has(sageVariant)) { log('缺少该变种的初级贤者之石。', 'warn'); return; }
   if (state.midSageVariants.has(sageVariant)) { log('你已经拥有该变种的中等贤者之石。', 'warn'); return; }
-
   const wisdomVariant = findPerfectWisdomVariant();
   if (!wisdomVariant) { log('需要一瓶完美品质的智慧药剂。', 'warn'); return; }
-
-  state.sageVariants.delete(sageVariant);
-  potSlot('wisdom', wisdomVariant)[2]--;
-
-  const success = Math.random() > MID_SAGE.failChance;
-
-  cauldronEl.classList.add('glow-sage');
-  setTimeout(() => cauldronEl.classList.remove('glow-sage'), 1400);
-  spawnBubbles(18);
-
-  const vd = VARIANTS[sageVariant];
-  const vLabel = vd.name ? `${vd.icon}${vd.name}` : '';
-
-  if (success) {
-    state.midSageVariants.add(sageVariant);
-    state.stats.midSageCrafted++;
-    cauldronEl.classList.add('glow-pure');
-    setTimeout(() => cauldronEl.classList.remove('glow-pure'), 1600);
-    showEventBanner('🟣 中等贤者之石诞生！', 'mid');
-    log(`✨✨ 炼制成功！获得【${vLabel}中等贤者之石】`, 'mid');
-    log('🟣 现在可以在坩埚下方的「贤者指定」中指定任意药剂与变种炼制。', 'sage');
-    log('🔮 「神秘的」变种已可在贤者指定中主动炼制（80% 成功率）。', 'sage');
-    const spd = Math.round((midSageSpeedMult() - 1) * 100);
-    log(`⏩ 炼制加速 +${spd}%。`, 'sage');
-    if (!SAGE_ALLOWED_VARIANTS.includes(state.activeSageVariant)) state.activeSageVariant = sageVariant;
-  } else {
-    cauldronEl.classList.add('glow-fail');
-    setTimeout(() => cauldronEl.classList.remove('glow-fail'), 1200);
-    const pool = RECIPES;
-    const r = pool[Math.floor(Math.random() * pool.length)];
-    const rq = Math.floor(Math.random() * 3);
-    potSlot(r.id, sageVariant)[rq]++;
-    log(`💥 炼制失败！初级贤者之石碎裂，转化为【${QUALITY[rq].name}·${vLabel}${r.name}】`, 'bad');
-    showEventBanner('💥 贤者之石碎裂……', 'bad');
-  }
-
-  safe(render, 'render');
-  safe(() => renderHeader(true), 'renderHeader');
-  checkAchievements();
-  safe(() => saveGame(true), 'saveGame');
+  /* ★ 进入精准滴定小游戏 */
+  log('🟣 准备精准滴定……');
+  setTimeout(() => openMidGame(sageVariant), 300);
 }
 
 /* ============================================================
@@ -2386,34 +2492,26 @@ function craftMidSage(sageVariant) {
 function craftPureSage() {
   if (state.pureSageOwned) { log('你已经拥有纯净的初等贤者之石。', 'warn'); return; }
   if (state.midSageVariants.size < 4) { log(`需要集齐 4 种中等贤者之石（${state.midSageVariants.size}/4）。`, 'warn'); return; }
-
   const elixirIdx = findPureElixirSlot();
   if (elixirIdx < 0) { log('需要一瓶纯净的万灵药。', 'warn'); return; }
-
   const wisdomQty = perfectWisdomCount();
   if (wisdomQty < 4) { log(`需要 4 瓶完美品质的智慧药剂（当前 ${wisdomQty}）。`, 'warn'); return; }
-
   potSlot('elixir', 'pure')[elixirIdx]--;
-
   let need = 4;
   for (const v of VARIANT_ORDER) {
     if (need <= 0) break;
     const arr = potSlot('wisdom', v);
     while (arr[2] > 0 && need > 0) { arr[2]--; need--; }
   }
-
   state.pureSageOwned = true;
-
   cauldronEl.classList.add('glow-pure');
   setTimeout(() => cauldronEl.classList.remove('glow-pure'), 2200);
   spawnBubbles(24);
   showEventBanner('💠 纯净的初等贤者之石诞生！', 'mid');
   log('💠✨ 纯净的初等贤者之石诞生了！贤者炼制界面已解锁「纯净」变种。', 'mid');
   addNews('贤者诞生', '有传闻称，某位炼金术士成功炼制出纯净的初等贤者之石——那是通往真理阶梯的第一级。', 'good');
-
   state.gold += 1000;
   state.rep += 150;
-
   safe(render, 'render');
   safe(() => renderHeader(true), 'renderHeader');
   checkAchievements();
@@ -2431,36 +2529,29 @@ function checkFinalSageMaterials() {
   if (!findMysteriousPotionSlot()) return false;
   return true;
 }
-
 function craftFinalSage() {
   if (state.finalSageOwned) { log('你已经炼制出最终贤者之石。', 'warn'); return; }
   if (!state.pureSageOwned) { log('需要先炼制纯净的初等贤者之石。', 'warn'); return; }
   if (state.midSageVariants.size < 4) { log('需要集齐 4 种中等贤者之石。', 'warn'); return; }
-
   const t2w = findT2WisdomSlot();
   if (!t2w) { log('需要一瓶睿智药剂。', 'warn'); return; }
   const myst = findMysteriousPotionSlot();
   if (!myst) { log('需要一瓶任意种类的神秘药剂。', 'warn'); return; }
-
   state.midSageVariants.clear();
   state.pureSageOwned = false;
   potSlot('t2wisdom', t2w.v)[t2w.qi]--;
   potSlot(myst.id, 'mysterious')[myst.qi]--;
-
   state.finalSageOwned = true;
-
   cauldronEl.classList.add('glow-ultimate');
   setTimeout(() => cauldronEl.classList.remove('glow-ultimate'), 3500);
   spawnBubbles(35);
   showEventBanner('🌌 最终贤者之石诞生！', 'ultimate');
   log('🌌✨✨✨ 最终贤者之石诞生了！你已抵达炼金术的终极彼岸。', 'ultimate');
-  log('🌟 已解锁「最终炼制」浮窗——点击顶栏 🌟 按钮。', 'sage');
+  log('🌟 贤者炼制已升级为「最终炼制」——全部 7 种变种可选，神秘的 100% 成功。', 'sage');
   addNews('贤者之极', '城中沸腾了——有人成功炼制出传说中的最终贤者之石！此事被传为佳话。', 'good');
-
   state.gold += 5000;
   state.rep += 500;
   log('💰 +5000　🏅 +500', 'ok');
-
   safe(render, 'render');
   safe(() => renderHeader(true), 'renderHeader');
   safe(checkWin, 'checkWin');
@@ -2506,8 +2597,6 @@ function pickClientForPotion(potionId) {
     if (r < 0.9) return CLIENTS.alchemist;
     return CLIENTS.noble;
   }
-
-  /* ★ 制造贤者路线：贵族订单明显增加 */
   if (state.storyFlags && state.storyFlags.inventorGenius) {
     if (r < 0.28) return CLIENTS.mercenary;
     if (r < 0.62) return CLIENTS.noble;
@@ -2516,7 +2605,6 @@ function pickClientForPotion(potionId) {
     if (r < 0.92) return CLIENTS.healer;
     return CLIENTS.stranger;
   }
-
   if (r < 0.20) return CLIENTS.mercenary;
   if (r < 0.38) return CLIENTS.noble;
   if (r < 0.58) return CLIENTS.farmer;
@@ -2524,22 +2612,17 @@ function pickClientForPotion(potionId) {
   if (r < 0.90) return CLIENTS.healer;
   return CLIENTS.stranger;
 }
-
-/* ★ 根据剧情调整各药剂在订单池中的权重 */
 function getPotionOrderWeight(potionId) {
   let w = 1.0;
   if (state.storyFlags && state.storyFlags.inventorGenius) {
-    /* 治疗药水 / 万灵药相关订单减少 */
     if (potionId === 'heal' || potionId === 't2heal') w *= 0.25;
     if (potionId === 'elixir' || potionId === 't2elixir') w *= 0.25;
   }
   if (state.storyFlags && state.storyFlags.inventorWar) {
-    /* 力量药剂相关订单减少 */
     if (potionId === 'strength' || potionId === 't2strength') w *= 0.25;
   }
   return w;
 }
-
 function pickWeightedPotion(pool) {
   const weighted = [];
   for (const pid of pool) {
@@ -2550,49 +2633,35 @@ function pickWeightedPotion(pool) {
   if (weighted.length === 0) return pool[Math.floor(Math.random() * pool.length)];
   return weighted[Math.floor(Math.random() * weighted.length)];
 }
-
 function generateOrder() {
   if (Math.random() < 0.20) {
     const chainOrder = tryChainOrder();
     if (chainOrder) return chainOrder;
   }
-
   const pool = [...state.discovered].filter(id => id !== SAGE.id);
   if (hasSage()) for (const t of TIER2) pool.push(t.id);
   if (pool.length === 0) return null;
-
-  /* ★ 加权选药 */
   const potionId = pickWeightedPotion(pool);
   const def = potionDef(potionId);
   if (!def) return null;
   const client = pickClientForPotion(potionId);
   const isNeg = !!def.negative;
-
   const qty = Math.random() < 0.22 ? 2 : 1;
   const minQuality = Math.max(client.minQuality, Math.random() < 0.30 ? 1 : 0);
-
   let variant = 'any';
   if (client === CLIENTS.alchemist && Math.random() < 0.35) {
     const opts = ['gentle','burning','refreshing','mad','pure','mysterious'];
     variant = opts[Math.floor(Math.random() * opts.length)];
   }
-
   const totalTime = (65000 + Math.random() * 55000) * client.timeMult;
-
   let reward = Math.round(def.price * qty * 1.85 * (minQuality > 0 ? 1.45 : 1) * client.goldMult);
   if (variant !== 'standard' && variant !== 'any') reward = Math.round(reward * (1 + VARIANTS[variant].mult * 0.3));
-
-  /* ★ 金币奖励随机浮动 ±30% */
   reward = Math.round(reward * (0.75 + Math.random() * 0.55));
-
   let repReward = Math.round((6 + def.price / 8) * client.repMult * repBonusMult());
-
   if (isNeg && client === CLIENTS.stranger) {
     reward = Math.round(reward * 1.4);
     repReward = -Math.abs(Math.round(5 + def.price / 15));
   }
-
-  /* ★ 25% 概率附带材料奖励 */
   let matsReward = null;
   if (Math.random() < 0.25) {
     const matIds = Object.keys(ING);
@@ -2600,18 +2669,15 @@ function generateOrder() {
     const mqty = 1 + Math.floor(Math.random() * 3);
     matsReward = { id: matId, qty: mqty };
   }
-
   return {
     uid: ++state.orderUid,
     potionId, qty, minQuality, variant,
     client: Object.keys(CLIENTS).find(k => CLIENTS[k] === client),
     quote: client.quotes[Math.floor(Math.random() * client.quotes.length)],
     timeLeft: totalTime, totalTime,
-    goldReward: reward, repReward,
-    matsReward,
+    goldReward: reward, repReward, matsReward,
   };
 }
-
 function tryChainOrder() {
   for (const chain of CHAINS) {
     const st = state.chainState[chain.id];
@@ -2621,13 +2687,11 @@ function tryChainOrder() {
     if (!step) { st.active = false; continue; }
     if (!state.discovered.has(step.potion)) continue;
     if (getTier2(step.potion) && !hasSage()) continue;
-
     const client = CLIENTS[chain.client];
     const def = potionDef(step.potion);
     if (!def) continue;
     const variant = step.variant || 'any';
     const vd = variant === 'any' ? null : VARIANTS[variant];
-
     const totalTime = 90000 * client.timeMult;
     let reward = Math.round(def.price * step.qty * 1.95 * client.goldMult);
     if (vd && vd.mult > 1) reward = Math.round(reward * (1 + vd.mult * 0.4));
@@ -2635,7 +2699,6 @@ function tryChainOrder() {
     let repReward = Math.round((8 + def.price / 6) * client.repMult * repBonusMult());
     if (def.negative) repReward = -Math.abs(repReward);
     repReward += step.bonusRep || 0;
-
     return {
       uid: ++state.orderUid,
       potionId: step.potion, qty: step.qty,
@@ -2649,7 +2712,6 @@ function tryChainOrder() {
   }
   return null;
 }
-
 function tickOrders(dtMs) {
   for (const cid in state.chainState) {
     const st = state.chainState[cid];
@@ -2693,22 +2755,16 @@ function tickOrders(dtMs) {
 }
 
 /* ============================================================
-   交付浮窗
+   交付
    ============================================================ */
 let pendingDeliver = null;
-
 function deliverOrder(uid) {
   const idx = state.orders.findIndex(o => o.uid === uid);
   if (idx < 0) return;
   const o = state.orders[idx];
-
-  if (o.variant === 'any') {
-    openDeliverModal(o);
-  } else {
-    executeDeliver(o, o.variant);
-  }
+  if (o.variant === 'any') openDeliverModal(o);
+  else executeDeliver(o, o.variant);
 }
-
 function openDeliverModal(order) {
   const avail = [];
   for (const v of VARIANT_ORDER) {
@@ -2717,27 +2773,20 @@ function openDeliverModal(order) {
     for (let qi = order.minQuality; qi < 3; qi++) total += arr[qi];
     if (total >= order.qty) avail.push({ variant: v, count: total });
   }
-  if (avail.length === 0) {
-    log('库存不足，无法交付。', 'warn');
-    return;
-  }
+  if (avail.length === 0) { log('库存不足，无法交付。', 'warn'); return; }
   pendingDeliver = { order, avail, selected: avail[0].variant };
   renderDeliverModal();
   $('deliverModal').classList.add('show');
 }
-
 function renderDeliverModal() {
   if (!pendingDeliver) return;
   const { order, avail, selected } = pendingDeliver;
   const def = potionDef(order.potionId);
   const client = CLIENTS[order.client] || CLIENTS.alchemist;
   const q = QUALITY[order.minQuality];
-
-  const infoEl = $('deliverOrderInfo');
-  infoEl.innerHTML = `
+  $('deliverOrderInfo').innerHTML = `
     <div class="d-client">${client.icon}${client.name} 的委托</div>
     <div class="d-req">${order.qty}× ${q.name}+ ${def.name}${order.chain ? ' · 连续委托' : ''}</div>`;
-
   const row = $('deliverVariants');
   row.innerHTML = '';
   for (const item of avail) {
@@ -2745,32 +2794,25 @@ function renderDeliverModal() {
     const btn = document.createElement('button');
     btn.className = 'd-v-btn' + (selected === item.variant ? ' active' : '');
     btn.innerHTML = `${vd.name ? vd.icon + vd.name : '标准'}<span class="d-count">×${item.count}</span>`;
-    btn.addEventListener('click', () => {
-      pendingDeliver.selected = item.variant;
-      renderDeliverModal();
-    });
+    btn.addEventListener('click', () => { pendingDeliver.selected = item.variant; renderDeliverModal(); });
     row.appendChild(btn);
   }
   $('deliverConfirm').disabled = false;
 }
-
 function closeDeliverModal() {
   $('deliverModal').classList.remove('show');
   pendingDeliver = null;
 }
-
 function confirmDeliver() {
   if (!pendingDeliver) return;
   const { order, selected } = pendingDeliver;
   closeDeliverModal();
   executeDeliver(order, selected);
 }
-
 function executeDeliver(order, variant) {
   const idx = state.orders.findIndex(o => o.uid === order.uid);
   if (idx < 0) return;
   const o = state.orders[idx];
-
   const arr = potSlot(o.potionId, variant);
   let need = o.qty;
   for (let qi = o.minQuality; qi < 3 && need > 0; qi++) {
@@ -2778,17 +2820,11 @@ function executeDeliver(order, variant) {
     arr[qi] -= use;
     need -= use;
   }
-  if (need > 0) {
-    log('库存不足，无法交付。', 'warn');
-    return;
-  }
-
+  if (need > 0) { log('库存不足，无法交付。', 'warn'); return; }
   state.gold += o.goldReward;
   state.rep += o.repReward;
   state.orders.splice(idx, 1);
   state.nextOrderIn = Math.min(state.nextOrderIn, 2500);
-
-  /* ★ 材料奖励 */
   if (o.matsReward && ING[o.matsReward.id]) {
     const mr = o.matsReward;
     const before = state.stock[mr.id] || 0;
@@ -2796,7 +2832,6 @@ function executeDeliver(order, variant) {
     const got = state.stock[mr.id] - before;
     if (got > 0) log(`🎁 客户额外附赠 ${got} 份 ${ING[mr.id].name}。`, 'ok');
   }
-
   const def = potionDef(o.potionId);
   const client = CLIENTS[o.client] || CLIENTS.alchemist;
   const vd = VARIANTS[variant];
@@ -2804,11 +2839,7 @@ function executeDeliver(order, variant) {
   const repTxt = o.repReward >= 0 ? `+${o.repReward}🏅` : `${o.repReward}🏅`;
   log(`✅ ${client.icon}${client.name}收货【${vTxt}${def ? def.name : '?'}】，获得 ${o.goldReward}💰 ${repTxt}`,
       o.repReward < 0 ? 'dark' : 'ok');
-
-  if (o.chain) {
-    handleChainDeliver(o, variant);
-  }
-
+  if (o.chain) handleChainDeliver(o, variant);
   safe(render, 'render');
   safe(() => renderHeader(true), 'renderHeader');
   safe(checkRepEvents, 'checkRepEvents');
@@ -2817,14 +2848,13 @@ function executeDeliver(order, variant) {
 }
 
 /* ============================================================
-   链的交付处理（含剧情分支）
+   链交付处理
    ============================================================ */
 function handleChainDeliver(order, variant) {
   const chain = CHAINS.find(c => c.id === order.chain);
   const st = state.chainState[order.chain];
   if (!chain || !st) return;
 
-  /* 生病的妻子 */
   if (chain.id === 'sick_wife') {
     if (variant === 'gentle') {
       addNews('仁心医师', '城郊传来佳话：一位炼金术士以温和之药救治了农夫的妻子。医者仁心，众人称赞。', 'good');
@@ -2838,9 +2868,7 @@ function handleChainDeliver(order, variant) {
       state.stats.badDoctorFlag = true;
       log('📰 新闻：「庸医当道」——你的鲁莽毁了名声。', 'bad');
       log('🏅 声望 -25', 'bad');
-      st.active = false;
-      st.step = 0;
-      st.cooldown = 0;
+      st.active = false; st.step = 0; st.cooldown = 0;
       state.stats.chainsCompleted++;
       state.stats.chainsDone.add(order.chain);
       return;
@@ -2854,7 +2882,6 @@ function handleChainDeliver(order, variant) {
     }
   }
 
-  /* ★ 发明家之梦：分支剧情 */
   if (chain.id === 'inventor_dream') {
     if (st.step === 0) {
       addNews('发明家的请求', '城中的发明家宣布正在研发一种前所未有的装置，并向炼金工坊求助，寻求智慧药剂。', 'info');
@@ -2895,7 +2922,6 @@ function handleChainDeliver(order, variant) {
     }
   }
 
-  /* 通用链推进 */
   st.step++;
   if (st.step >= chain.steps.length) {
     st.active = false;
@@ -2903,7 +2929,6 @@ function handleChainDeliver(order, variant) {
     state.stats.chainsCompleted++;
     state.stats.chainsDone.add(order.chain);
     log(`🎉 完成了【${chain.title}】的全部委托！`, 'sage');
-
     if (chain.id === 'plague') {
       state.gold += 500; state.rep += 80;
       log('⚕️ 瘟疫平息了，全镇的人都在感谢你。', 'sage');
@@ -2933,7 +2958,7 @@ function handleChainDeliver(order, variant) {
 }
 
 /* ============================================================
-   订单链激活
+   链激活
    ============================================================ */
 function initChains() {
   for (const chain of CHAINS) {
@@ -2944,7 +2969,6 @@ function updateChainActivation() {
   for (const chain of CHAINS) {
     const st = state.chainState[chain.id];
     if (!st || st.active || st.step > 0) continue;
-    /* ★ 一次性链：已激活过就不再出现 */
     if (chain.once && state.stats.chainsActivated.has(chain.id)) continue;
     const first = chain.steps[0];
     if (state.discovered.has(first.potion) && Math.random() < 0.18) {
@@ -2989,7 +3013,7 @@ function tickMerchant(dt) {
     if (m.timeLeft <= 0) closeMerchant(true);
     else $('mTimerBar').style.width = Math.max(0, (m.timeLeft / MERCHANT_STAY) * 100) + '%';
   } else {
-    if (brew.active) return;
+    if (brew.active || primaryGame.active || midGame.active) return;
     m.nextIn -= dt;
     if (m.nextIn <= 0) {
       if (!trySpawnMerchant()) m.nextIn = 12000;
@@ -2997,7 +3021,6 @@ function tickMerchant(dt) {
     }
   }
 }
-
 function trySpawnMerchant() {
   const offer = buildMerchantOffer();
   if (!offer) return false;
@@ -3010,7 +3033,6 @@ function trySpawnMerchant() {
   log(`🧙 ${offer.type.icon}${offer.type.name}敲响了工坊的门……`, 'warn');
   return true;
 }
-
 function buildMerchantOffer() {
   const type = MERCHANT_TYPES[Math.floor(Math.random() * MERCHANT_TYPES.length)];
   const candidates = [];
@@ -3066,7 +3088,6 @@ function buildMerchantOffer() {
   }
   return { items, totalGold, gift, type };
 }
-
 function renderMerchant() {
   const o = state.merchant.offer;
   if (!o) return;
@@ -3092,7 +3113,6 @@ function renderMerchant() {
   }
   $('mTimerBar').style.width = '100%';
 }
-
 function closeMerchant(timeout) {
   state.merchant.active = false;
   state.merchant.offer = null;
@@ -3100,7 +3120,6 @@ function closeMerchant(timeout) {
   merchantModal.classList.remove('show');
   if (timeout) log('🧙 商人摇了摇头，消失在暮色中。', 'warn');
 }
-
 function merchantAccept() {
   const o = state.merchant.offer;
   if (!o) return;
@@ -3133,7 +3152,6 @@ function merchantAccept() {
   checkAchievements();
   safe(() => saveGame(true), 'saveGame');
 }
-
 $('mAccept').addEventListener('click', merchantAccept);
 $('mDecline').addEventListener('click', () => { log('🧙 你婉拒了商人的收购。', 'warn'); closeMerchant(false); });
 
@@ -3151,7 +3169,6 @@ function checkRepEvents() {
     if (t.at < 0 && state.rep <= t.at && !t._triggered) { t._triggered = true; triggerRepEvent(t, true); }
   }
 }
-
 function triggerRepEvent(tier, negative) {
   showEventBanner(`${tier.icon} ${tier.name}`, tier.kind);
   log(`【${tier.name}】${tier.kind === 'good' ? '你的名声传开了。' : '人们对你的行径议论纷纷。'}`,
@@ -3198,7 +3215,7 @@ document.querySelectorAll('.tab').forEach(t => {
 });
 
 /* ============================================================
-   气泡特效
+   气泡
    ============================================================ */
 function spawnBubbles(n = 8) {
   for (let i = 0; i < n; i++) {
@@ -3222,7 +3239,6 @@ function checkAllUnlocked() {
   }
   updateChainActivation();
 }
-
 let winShown = false;
 function checkWin() {
   if (winShown) return;
@@ -3239,12 +3255,12 @@ function checkWin() {
    主循环
    ============================================================ */
 let lastT = performance.now();
-let uiAcc = 0, orderAcc = 0, etaAcc = 0, chainAcc = 0, saveAcc = 0, newsAcc = 0;
+let uiAcc = 0, orderAcc = 0, etaAcc = 0, chainAcc = 0, saveAcc = 0;
 
 function loop(t) {
   const dt = Math.min(t - lastT, 200);
   lastT = t;
-  uiAcc += dt; orderAcc += dt; etaAcc += dt; chainAcc += dt; saveAcc += dt; newsAcc += dt;
+  uiAcc += dt; orderAcc += dt; etaAcc += dt; chainAcc += dt; saveAcc += dt;
 
   safe(() => tickMerchant(dt), 'tickMerchant');
   if (etaAcc >= 250) { renderMerchantEta(); etaAcc = 0; }
@@ -3284,238 +3300,17 @@ function loop(t) {
 }
 
 /* ============================================================
-   ★ 最终炼制浮窗
-   ============================================================ */
-const finalCraftModal = $('finalCraftModal');
-
-const finalCraftState = {
-  variant: 'standard',
-  potionId: null,
-  crafting: false,
-};
-
-function openFinalCraftModal() {
-  /* ★ 未解锁时禁止打开 */
-  if (!state.finalSageOwned) {
-    log('需要先炼制出最终贤者之石。', 'warn');
-    return;
-  }
-  finalCraftState.crafting = false;
-  finalCraftState.potionId = null;
-  finalCraftModal.classList.add('show');
-  renderFinalCraft();
-}
-
-function closeFinalCraftModal() {
-  if (finalCraftState.crafting) return;
-  finalCraftModal.classList.remove('show');
-}
-
-function renderFinalCraft() {
-  /* ★ 未解锁时不渲染、强制关闭 */
-  if (!state.finalSageOwned) {
-    if (finalCraftModal && finalCraftModal.classList.contains('show')) {
-      finalCraftModal.classList.remove('show');
-    }
-    return;
-  }
-  if (!finalCraftModal || !finalCraftModal.classList.contains('show')) {
-    if (!finalCraftState.crafting) return;
-  }
-
-  const isCrafting = finalCraftState.crafting;
-
-  const vRow = $('fcVariants');
-  if (vRow) {
-    vRow.innerHTML = '';
-    for (const v of VARIANT_ORDER) {
-      const vd = VARIANTS[v];
-      const btn = document.createElement('button');
-      btn.className = 'fc-v-btn' + (finalCraftState.variant === v ? ' active' : '');
-      btn.innerHTML = vd.name ? `${vd.icon}${vd.name}` : '标准';
-      btn.disabled = isCrafting;
-      btn.addEventListener('click', () => {
-        if (finalCraftState.crafting) return;
-        finalCraftState.variant = v;
-        renderFinalCraft();
-      });
-      vRow.appendChild(btn);
-    }
-  }
-
-  const pList = $('fcPotions');
-  if (pList) {
-    pList.innerHTML = '';
-    const potions = getSageCraftPotions().filter(p => p.id !== SAGE.id);
-    for (const p of potions) {
-      const btn = document.createElement('button');
-      btn.className = 'fc-p-btn' + (finalCraftState.potionId === p.id ? ' active' : '');
-      btn.innerHTML = `${iconHTML(p.icon, 1.1)}${p.name}`;
-      btn.disabled = isCrafting;
-      btn.addEventListener('click', () => {
-        if (finalCraftState.crafting) return;
-        finalCraftState.potionId = p.id;
-        renderFinalCraft();
-      });
-      pList.appendChild(btn);
-    }
-  }
-
-  const matsEl = $('fcMaterials');
-  if (matsEl) {
-    if (state.cauldron.length === 0) {
-      matsEl.innerHTML = '<span class="fc-mat-empty">坩埚为空，请先在材料架中投入至少 2 种材料</span>';
-    } else {
-      matsEl.innerHTML = state.cauldron.map(id =>
-        `<span class="fc-mat">${iconHTML(ING[id].icon, 1.1)}${ING[id].name}</span>`
-      ).join('');
-    }
-  }
-
-  const statusEl = $('fcStatus');
-  const startBtn = $('finalCraftStartBtn');
-  const closeBtn = $('finalCraftClose');
-  if (!statusEl || !startBtn) return;
-
-  if (isCrafting) {
-    statusEl.textContent = '最终仪式进行中……';
-    startBtn.disabled = true;
-    if (closeBtn) closeBtn.disabled = true;
-  } else {
-    if (closeBtn) closeBtn.disabled = false;
-    if (!finalCraftState.potionId) {
-      statusEl.textContent = '请选择药剂与变种';
-      startBtn.disabled = true;
-    } else if (state.cauldron.length < 2) {
-      statusEl.textContent = `坩埚材料不足（${state.cauldron.length}/2）`;
-      startBtn.disabled = true;
-    } else {
-      const vd = VARIANTS[finalCraftState.variant];
-      const def = potionDef(finalCraftState.potionId);
-      const vTxt = vd.name ? `${vd.icon}${vd.name}` : '标准';
-      statusEl.innerHTML = `将炼制：<b>完美品质【${vTxt}】${def.name}</b><br>
-        <span style="color:#8a7a62;font-size:10.5px">最终仪式必定成功 · 消耗坩埚中全部材料</span>`;
-      startBtn.disabled = false;
-    }
-  }
-}
-
-function startFinalCraft() {
-  if (!state.finalSageOwned) return;
-  if (finalCraftState.crafting) return;
-  if (!finalCraftState.potionId) return;
-  if (state.cauldron.length < 2) return;
-
-  finalCraftState.crafting = true;
-  renderFinalCraft();
-
-  state.cauldron = [];
-  safe(renderCauldron, 'renderCauldron');
-  safe(renderIngredients, 'renderIngredients');
-
-  const progEl = $('fcProgress');
-  if (progEl) {
-    progEl.classList.add('show');
-    const bar = progEl.querySelector('i');
-    if (bar) bar.style.width = '0%';
-
-    let p = 0;
-    const speed = midSageSpeedMult();
-    const tick = () => {
-      if (!finalCraftState.crafting) return;
-      p += 3.5 * speed;
-      if (bar) bar.style.width = Math.min(100, p) + '%';
-      if (p < 100) {
-        setTimeout(tick, 40);
-      } else {
-        finishFinalCraft();
-      }
-    };
-    setTimeout(tick, 250);
-  } else {
-    setTimeout(finishFinalCraft, 800);
-  }
-}
-
-function finishFinalCraft() {
-  const variant = finalCraftState.variant;
-  const potionId = finalCraftState.potionId;
-
-  const def = potionDef(potionId);
-  if (!def) {
-    finalCraftState.crafting = false;
-    renderFinalCraft();
-    return;
-  }
-
-  potSlot(potionId, variant)[2]++;
-  state.stats.potionsBrewed++;
-  state.stats.perfectBrewed++;
-  state.stats.sageCraftCount++;
-  state.stats.variantsSeen.add(variant);
-
-  const vd = VARIANTS[variant];
-  const vTxt = vd.name ? `${vd.icon}${vd.name}` : '';
-
-  cauldronEl.classList.add('glow-ultimate');
-  setTimeout(() => cauldronEl.classList.remove('glow-ultimate'), 2200);
-  spawnBubbles(30);
-  showEventBanner('🌟 最终仪式完成！', 'ultimate');
-  log(`🌟✨ 最终仪式凝练出【完美·${vTxt}${def.name}】！`, 'ultimate');
-
-  finalCraftState.crafting = false;
-  finalCraftState.potionId = null;
-
-  setTimeout(() => {
-    const progEl = $('fcProgress');
-    if (progEl) {
-      progEl.classList.remove('show');
-      const bar = progEl.querySelector('i');
-      if (bar) bar.style.width = '0%';
-    }
-    finalCraftModal.classList.remove('show');
-
-    safe(render, 'render');
-    safe(() => renderHeader(true), 'renderHeader');
-    safe(checkAchievements, 'checkAchievements');
-    safe(() => saveGame(true), 'saveGame');
-  }, 1400);
-
-  renderFinalCraft();
-}
-
-$('finalCraftBtn').addEventListener('click', openFinalCraftModal);
-$('finalCraftClose').addEventListener('click', closeFinalCraftModal);
-$('finalCraftStartBtn').addEventListener('click', startFinalCraft);
-finalCraftModal.addEventListener('click', e => {
-  if (e.target === finalCraftModal) closeFinalCraftModal();
-});
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && finalCraftModal.classList.contains('show')) {
-    closeFinalCraftModal();
-  }
-});
-
-/* ============================================================
-   更新说明浮窗
+   更新说明
    ============================================================ */
 const updateModal = $('updateModal');
 const updateBody  = $('updateBody');
-
 function openUpdateModal() {
   updateModal.classList.add('show');
   updateBody.innerHTML = '<span class="u-loading">加载中…</span>';
-
   fetch('assets/update.txt', { cache: 'no-store' })
-    .then(r => {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.text();
-    })
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
     .then(text => {
-      if (!text || !text.trim()) {
-        updateBody.innerHTML = '<span class="u-loading">暂无更新说明。</span>';
-        return;
-      }
+      if (!text || !text.trim()) { updateBody.innerHTML = '<span class="u-loading">暂无更新说明。</span>'; return; }
       updateBody.textContent = text;
     })
     .catch(err => {
@@ -3524,34 +3319,26 @@ function openUpdateModal() {
         '可能原因：<br>' +
         '· 文件不存在或路径不正确<br>' +
         '· 通过 file:// 直接打开网页（浏览器会拦截本地文件读取）<br><br>' +
-        '请使用 HTTP 服务器访问，例如在项目根目录执行：<br>' +
+        '请使用 HTTP 服务器访问，例如：<br>' +
         '　　python -m http.server 8000<br>' +
         '然后访问 http://localhost:8000/</span>';
       console.warn('读取更新说明失败：', err);
     });
 }
-
-function closeUpdateModal() {
-  updateModal.classList.remove('show');
-}
-
+function closeUpdateModal() { updateModal.classList.remove('show'); }
 $('updateBtn').addEventListener('click', openUpdateModal);
 $('updateClose').addEventListener('click', closeUpdateModal);
-updateModal.addEventListener('click', e => {
-  if (e.target === updateModal) closeUpdateModal();
-});
+updateModal.addEventListener('click', e => { if (e.target === updateModal) closeUpdateModal(); });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && updateModal.classList.contains('show')) closeUpdateModal();
 });
 
 /* ============================================================
-   交付浮窗事件
+   交付浮窗
    ============================================================ */
 $('deliverClose').addEventListener('click', closeDeliverModal);
 $('deliverConfirm').addEventListener('click', confirmDeliver);
-$('deliverModal').addEventListener('click', e => {
-  if (e.target === $('deliverModal')) closeDeliverModal();
-});
+$('deliverModal').addEventListener('click', e => { if (e.target === $('deliverModal')) closeDeliverModal(); });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && $('deliverModal').classList.contains('show')) closeDeliverModal();
 });
@@ -3578,12 +3365,10 @@ if (loaded) {
   log(`——${WORLD.subtitle}——`);
   log('选取 2~3 种材料投入坩埚，点击「调配」开始。');
   log('🛒 将鼠标移到材料上，可看到当前买入价格。');
-  log('💰 价格随声誉涨落——声誉越高越便宜。');
-  log('📜 大多数订单不限变种，提交时可自选变种，剧情会因此改变。');
-  log('📰 城中见闻会记录你的一举一动。');
-  log('💡 某些委托只出现一次，且会改变这座城市的命运。');
-  log('🌌 唯有一路走到最终贤者之石，方能开启「最终炼制」。');
-
+  log('🔴 投入火之精华、硫磺、月光草后，需通过「三元素锁定」小游戏炼制初级贤者之石。');
+  log('🟣 拥有初级贤者之石后，可用「精准滴定」小游戏炼制中等贤者之石。');
+  log('🌟 拥有中等或最终贤者之石后，进阶面板解锁，可进行贤者指定炼制。');
+  log('🌌 唯有一路走到最终贤者之石，方能将贤者炼制升级为「最终炼制」。');
   setTimeout(() => {
     addNews('艾瑟瑞亚 · 晨间', `${WORLD.subtitle}。${WORLD.description.slice(0, 60)}…`, 'info');
     addNews('城中闲谈开张', '本栏目致力于记录艾瑟瑞亚的每一桩趣闻，从今日起每日更新。', 'info');
