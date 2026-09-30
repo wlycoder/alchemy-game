@@ -3,19 +3,21 @@
    ============================================================ */
 
 const ING = {
-  herb:     { name:'草药',     icon:'🌿', rate:2600, max:5, price:12, temp:'cold' },
-  water:    { name:'泉水',     icon:'💧', rate:2000, max:5, price:12, temp:'cold' },
-  mushroom: { name:'蘑菇',     icon:'🍄', rate:3400, max:5, price:14, temp:'neutral' },
-  fire:     { name:'火之精华', icon:'🔥', rate:4600, max:4, price:25, temp:'hot' },
-  ice:      { name:'冰晶',     icon:'❄️', rate:4600, max:4, price:25, temp:'cold' },
-  thunder:  { name:'雷石',     icon:'⚡', rate:6200, max:3, price:32, temp:'hot' },
-  moon:     { name:'月光草',   icon:'🌙', rate:6200, max:3, price:32, temp:'cold' },
-  sulfur:   { name:'硫磺',     icon:'./assests/texture/materials/sulfur.png', rate:7600, max:3, price:42, temp:'hot' },
-  crystal:  { name:'水晶',     icon:'💎', rate:8000, max:3, price:46, temp:'neutral' },
-  phoenix:  { name:'凤凰羽',   icon:'./assests/texture/materials/feather.png', rate:9500, max:2, price:60, temp:'hot' },
+  herb:     { name:'草药',     icon:'🌿', rate:2600, price:12, temp:'cold' },
+  water:    { name:'泉水',     icon:'💧', rate:2000, price:12, temp:'cold' },
+  mushroom: { name:'蘑菇',     icon:'🍄', rate:3400, price:14, temp:'neutral' },
+  fire:     { name:'火之精华', icon:'🔥', rate:4600, price:25, temp:'hot' },
+  ice:      { name:'冰晶',     icon:'❄️', rate:4600, price:25, temp:'cold' },
+  thunder:  { name:'雷石',     icon:'⚡', rate:6200, price:32, temp:'hot' },
+  moon:     { name:'月光草',   icon:'🌙', rate:6200, price:32, temp:'cold' },
+  sulfur:   { name:'硫磺',     icon:'./assets/texture/materials/sulfur.png', rate:7600, price:42, temp:'hot' },
+  crystal:  { name:'水晶',     icon:'💎', rate:8000, price:46, temp:'neutral' },
+  phoenix:  { name:'凤凰羽',   icon:'./assets/texture/materials/feather.png', rate:9500, price:60, temp:'hot' },
 };
 /* ★ 每种材料的初始库存数量 */
 const ING_START_STOCK = 10;
+/* ★ 自动恢复上限：库存达到该数量后便不再自动恢复（购买不受此限制） */
+const ING_RECOVER_CAP = 5;
 const VARIANTS = {
   standard:   { name:'',     icon:'',  color:'#9aa0a6', mult:1.0 },
   gentle:     { name:'温和的', icon:'❄️', color:'#7ee787', mult:1.5 },
@@ -140,7 +142,7 @@ const RECIPES = [
   { id:'storm',    name:'雷暴药剂', icon:'🌩️', price:70,  mats:['thunder','fire'],             hint:'天雷引燃烈火' },
   { id:'moonlight',name:'月光药剂', icon:'🌙', price:65,  mats:['moon','water'],               hint:'月光沉入清泉' },
   { id:'static',   name:'静电药剂', icon:'🔋', price:60,  mats:['thunder','ice'],              hint:'雷霆冻结成霜' },
-  { id:'invis',    name:'隐身药水', icon:'./assests/texture/potion/invisibility.png', price:80, mats:['moon','ice'], hint:'寒冰中的月影' },
+  { id:'invis',    name:'隐身药水', icon:'./assets/texture/potion/invisibility.png', price:80, mats:['moon','ice'], hint:'寒冰中的月影' },
   { id:'poison',   name:'剧毒药剂', icon:'☠️', price:75,  mats:['mushroom','sulfur'],          hint:'菌类与硫磺的恶意', negative:true },
   { id:'wisdom',   name:'智慧药剂', icon:'📘', price:95,  mats:['crystal','moon'],             hint:'水晶映照月华，启迪心智' },
   { id:'vitality', name:'活力药剂', icon:'💗', price:110, mats:['phoenix','herb'],             hint:'凤凰羽与草药，生生不息' },

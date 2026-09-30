@@ -540,8 +540,8 @@ function renderIngredients() {
     el.btn.disabled = (n <= 0) || brew.active || hasRefine || gameActive;
     el.btn.classList.toggle('gather-locked', !gatherOk);
     el.btn.title = gatherOk ? '' : '🔒 获得中等贤者之石后解锁材料自动恢复';
-    el.bar.style.width = (!gatherOk || n >= ING[id].max) ? '0%' : Math.min(100, state.acc[id] * 100) + '%';
-    el.buy.classList.toggle('off', n >= ING[id].max || brew.active || hasRefine || gameActive);
+    el.bar.style.width = (!gatherOk || n >= ING_RECOVER_CAP) ? '0%' : Math.min(100, state.acc[id] * 100) + '%';
+    el.buy.classList.toggle('off', brew.active || hasRefine || gameActive);
   }
 }
 function renderCauldron() {
@@ -1718,7 +1718,7 @@ function cancelPrimaryGame() {
   if (primaryGame.rafId) { try { cancelAnimationFrame(primaryGame.rafId); } catch(e){} primaryGame.rafId = null; }
   closeSageGame();
   for (const id of state.cauldron) {
-    if (ING[id]) state.stock[id] = Math.min(ING[id].max, state.stock[id] + 1);
+    if (ING[id]) state.stock[id]++;
   }
   state.cauldron = [];
   brew.active = false;
@@ -1759,7 +1759,7 @@ function onPrimaryGameSuccess() {
 function onPrimaryGameFail() {
   // 退还坩埚材料
   for (const id of state.cauldron) {
-    if (ING[id]) state.stock[id] = Math.min(ING[id].max, state.stock[id] + 1);
+    if (ING[id]) state.stock[id]++;
   }
   state.cauldron = [];
   brew.active = false;
@@ -2011,7 +2011,7 @@ function clearCauldron() {
     return;
   }
   for (const id of state.cauldron) {
-    if (ING[id]) state.stock[id] = Math.min(ING[id].max, state.stock[id] + 1);
+    if (ING[id]) state.stock[id]++;
   }
   if (state.cauldron.length) log('材料已全部取回。');
   state.cauldron = [];
@@ -2024,7 +2024,6 @@ function buyIngredient(id) {
   const d = ING[id];
   if (brew.active || primaryGame.active || midGame.active) return;
   if (state.cauldronPotion) { log('请先清空重炼台上的药剂。', 'warn'); return; }
-  if (state.stock[id] >= d.max) { log(`${d.name}库存已满。`, 'warn'); return; }
   const price = ingPrice(id);
   if (state.gold < price) { log(`金币不足（需要 ${price}💰）。`, 'warn'); return; }
   state.gold -= price;
@@ -2202,7 +2201,7 @@ function startBrew() {
     if (state.sageVariants.size > 0) {
       log('你已经拥有初级贤者之石，无需再炼制。', 'warn');
       for (const id of state.cauldron) {
-        if (ING[id]) state.stock[id] = Math.min(ING[id].max, state.stock[id] + 1);
+        if (ING[id]) state.stock[id]++;
       }
       state.cauldron = [];
       safe(render, 'render');
@@ -2304,7 +2303,7 @@ function finishBrew() {
     if (!recipe) {
       log('⚠️ 炼药异常：配方丢失，材料已退回。', 'warn');
       for (const id of state.cauldron) {
-        if (ING[id]) state.stock[id] = Math.min(ING[id].max, state.stock[id] + 1);
+        if (ING[id]) state.stock[id]++;
       }
       return;
     }
@@ -2355,7 +2354,7 @@ function finishBrew() {
   } finally {
     if (!success) {
       for (const id of state.cauldron) {
-        if (ING[id]) state.stock[id] = Math.min(ING[id].max, state.stock[id] + 1);
+        if (ING[id]) state.stock[id]++;
       }
     }
     state.cauldron = [];
@@ -2439,7 +2438,7 @@ function autoBrew(recipe) {
     } finally {
       if (!success) {
         for (const id of state.cauldron) {
-          if (ING[id]) state.stock[id] = Math.min(ING[id].max, state.stock[id] + 1);
+          if (ING[id]) state.stock[id]++;
         }
       }
       state.cauldron = [];
@@ -2853,7 +2852,7 @@ function executeDeliver(order, variant) {
   if (o.matsReward && ING[o.matsReward.id]) {
     const mr = o.matsReward;
     const before = state.stock[mr.id] || 0;
-    state.stock[mr.id] = Math.min(ING[mr.id].max, before + mr.qty);
+    state.stock[mr.id] = before + mr.qty;
     const got = state.stock[mr.id] - before;
     if (got > 0) log(`🎁 客户额外附赠 ${got} 份 ${ING[mr.id].name}。`, 'ok');
   }
@@ -3295,13 +3294,14 @@ function loop(t) {
     if (gatherUnlocked()) {
       const gm = gatherMult();
       for (const id in ING) {
-        if (state.stock[id] < ING[id].max) {
+        /* ★ 自动恢复上限 5：达到后停止恢复（购买不受限制） */
+        if (state.stock[id] < ING_RECOVER_CAP) {
           state.acc[id] += dt / (ING[id].rate / gm);
-          while (state.acc[id] >= 1 && state.stock[id] < ING[id].max) {
+          while (state.acc[id] >= 1 && state.stock[id] < ING_RECOVER_CAP) {
             state.acc[id] -= 1;
             state.stock[id]++;
           }
-          if (state.stock[id] >= ING[id].max) state.acc[id] = 0;
+          if (state.stock[id] >= ING_RECOVER_CAP) state.acc[id] = 0;
         } else state.acc[id] = 0;
       }
     } else {
